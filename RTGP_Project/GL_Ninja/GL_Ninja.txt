@@ -1,0 +1,1 @@
+./Debug/main.cpp.o ./Debug/up_include_glad_glad.c.o   

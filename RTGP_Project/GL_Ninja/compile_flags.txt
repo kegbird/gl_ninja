@@ -1,0 +1,5 @@
+-ID:\Home\Documenti\Repos\RTGP_Project\GL_Ninja
+-ID:\Home\Documenti\Repos\RTGP_Project\include
+-ID:\Home\Documenti\Repos\RTGP_Project\include\bullet
+-target
+x86_64-pc-windows-gnu
