@@ -1,33 +1,54 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Session Name="D:\Home\Documenti\Repos\RTGP_Project\RTGP_Project.workspace">
+<Session Name="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\RTGP_Project.workspace">
   <int Value="0" Name="m_selectedTab"/>
-  <wxString Value="D:\Home\Documenti\Repos\RTGP_Project\RTGP_Project.workspace" Name="m_workspaceName"/>
+  <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\RTGP_Project.workspace" Name="m_workspaceName"/>
   <TabInfoArray Name="TabInfoArray">
     <TabInfo>
-      <wxString Value="D:\Home\Documenti\Repos\RTGP_Project\GL_Ninja\main.cpp" Name="FileName"/>
-      <int Value="516" Name="FirstVisibleLine"/>
-      <int Value="528" Name="CurrentLine"/>
+      <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\GL_Ninja\main.cpp" Name="FileName"/>
+      <int Value="218" Name="FirstVisibleLine"/>
+      <int Value="243" Name="CurrentLine"/>
       <wxArrayString Name="Bookmarks"/>
       <IntVector Name="CollapsedFolds"/>
     </TabInfo>
     <TabInfo>
-      <wxString Value="D:\Home\Documenti\Repos\RTGP_Project\include\utils\mesh_v2.h" Name="FileName"/>
-      <int Value="82" Name="FirstVisibleLine"/>
-      <int Value="84" Name="CurrentLine"/>
+      <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include\utils\model.h" Name="FileName"/>
+      <int Value="75" Name="FirstVisibleLine"/>
+      <int Value="183" Name="CurrentLine"/>
       <wxArrayString Name="Bookmarks"/>
       <IntVector Name="CollapsedFolds"/>
     </TabInfo>
     <TabInfo>
-      <wxString Value="D:\Home\Documenti\Repos\RTGP_Project\include\utils\camera.h" Name="FileName"/>
-      <int Value="117" Name="FirstVisibleLine"/>
-      <int Value="135" Name="CurrentLine"/>
+      <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\GL_Ninja\phong.frag" Name="FileName"/>
+      <int Value="0" Name="FirstVisibleLine"/>
+      <int Value="0" Name="CurrentLine"/>
       <wxArrayString Name="Bookmarks"/>
       <IntVector Name="CollapsedFolds"/>
     </TabInfo>
     <TabInfo>
-      <wxString Value="D:\Home\Documenti\Repos\RTGP_Project\GL_Ninja\18_phong_tex_multiplelights.vert" Name="FileName"/>
-      <int Value="69" Name="FirstVisibleLine"/>
-      <int Value="77" Name="CurrentLine"/>
+      <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\GL_Ninja\phong.vert" Name="FileName"/>
+      <int Value="0" Name="FirstVisibleLine"/>
+      <int Value="0" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+      <IntVector Name="CollapsedFolds"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include\utils\camera.h" Name="FileName"/>
+      <int Value="13" Name="FirstVisibleLine"/>
+      <int Value="15" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+      <IntVector Name="CollapsedFolds"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include\utils\mesh.h" Name="FileName"/>
+      <int Value="18" Name="FirstVisibleLine"/>
+      <int Value="20" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+      <IntVector Name="CollapsedFolds"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include\utils\shader.h" Name="FileName"/>
+      <int Value="12" Name="FirstVisibleLine"/>
+      <int Value="19" Name="CurrentLine"/>
       <wxArrayString Name="Bookmarks"/>
       <IntVector Name="CollapsedFolds"/>
     </TabInfo>

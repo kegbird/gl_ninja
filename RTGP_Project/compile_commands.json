@@ -1,9 +1,9 @@
 [{
-  "file": "D:\\Home\\Documenti\\Repos\\RTGP_Project\\GL_Ninja\\main.cpp",
-  "directory": "D:\\Home\\Documenti\\Repos\\RTGP_Project\\GL_Ninja",
-  "command": "clang  -c D:\\Home\\Documenti\\Repos\\RTGP_Project\\GL_Ninja\\main.cpp -o D:\\Home\\Documenti\\Repos\\RTGP_Project\\GL_Ninja\\main.cpp.o -target x86_64-pc-windows-gnu -I. -I. -I../include -I../include/bullet  -g  -O0  -Wall  -std=c++0x"
+  "file": "D:\\Home\\Documenti\\Repos\\GL_Ninja\\RTGP_Project\\GL_Ninja\\main.cpp",
+  "directory": "D:\\Home\\Documenti\\Repos\\GL_Ninja\\RTGP_Project\\GL_Ninja",
+  "command": "clang  -c D:\\Home\\Documenti\\Repos\\GL_Ninja\\RTGP_Project\\GL_Ninja\\main.cpp -o D:\\Home\\Documenti\\Repos\\GL_Ninja\\RTGP_Project\\GL_Ninja\\main.cpp.o -target x86_64-pc-windows-gnu -I. -I. -I../include -I../include/bullet  -g  -O0  -Wall  -std=c++0x"
  }, {
-  "file": "D:\\Home\\Documenti\\Repos\\RTGP_Project\\include\\glad\\glad.c",
-  "directory": "D:\\Home\\Documenti\\Repos\\RTGP_Project\\GL_Ninja",
-  "command": "clang  -c D:\\Home\\Documenti\\Repos\\RTGP_Project\\include\\glad\\glad.c -o D:\\Home\\Documenti\\Repos\\RTGP_Project\\include\\glad\\glad.c.o -target x86_64-pc-windows-gnu -I. -I. -I../include -I../include/bullet  -g  -O0  -Wall"
+  "file": "D:\\Home\\Documenti\\Repos\\GL_Ninja\\RTGP_Project\\include\\glad\\glad.c",
+  "directory": "D:\\Home\\Documenti\\Repos\\GL_Ninja\\RTGP_Project\\GL_Ninja",
+  "command": "clang  -c D:\\Home\\Documenti\\Repos\\GL_Ninja\\RTGP_Project\\include\\glad\\glad.c -o D:\\Home\\Documenti\\Repos\\GL_Ninja\\RTGP_Project\\include\\glad\\glad.c.o -target x86_64-pc-windows-gnu -I. -I. -I../include -I../include/bullet  -g  -O0  -Wall"
  }]

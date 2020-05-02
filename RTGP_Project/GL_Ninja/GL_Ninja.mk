@@ -5,15 +5,15 @@
 ## Debug
 ProjectName            :=GL_Ninja
 ConfigurationName      :=Debug
-WorkspacePath          :=D:/Home/Documenti/Repos/RTGP_Project
-ProjectPath            :=D:/Home/Documenti/Repos/RTGP_Project/GL_Ninja
+WorkspacePath          :=D:/Home/Documenti/Repos/GL_Ninja/RTGP_Project
+ProjectPath            :=D:/Home/Documenti/Repos/GL_Ninja/RTGP_Project/GL_Ninja
 IntermediateDirectory  :=./Debug
 OutDir                 := $(IntermediateDirectory)
 CurrentFileName        :=
 CurrentFilePath        :=
 CurrentFileFullPath    :=
 User                   :=prebi
-Date                   :=29/04/2020
+Date                   :=02/05/2020
 CodeLitePath           :="C:/Program Files/CodeLite"
 LinkerName             :=C:/MinGW/bin/g++.exe
 SharedObjectLinkerName :=C:/MinGW/bin/g++.exe -shared -fPIC
@@ -102,7 +102,7 @@ PreBuild:
 ## Objects
 ##
 $(IntermediateDirectory)/main.cpp$(ObjectSuffix): main.cpp $(IntermediateDirectory)/main.cpp$(DependSuffix)
-	$(CXX) $(IncludePCH) $(SourceSwitch) "D:/Home/Documenti/Repos/RTGP_Project/GL_Ninja/main.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IncludePath)
+	$(CXX) $(IncludePCH) $(SourceSwitch) "D:/Home/Documenti/Repos/GL_Ninja/RTGP_Project/GL_Ninja/main.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IncludePath)
 $(IntermediateDirectory)/main.cpp$(DependSuffix): main.cpp
 	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/main.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/main.cpp$(DependSuffix) -MM main.cpp
 
@@ -110,7 +110,7 @@ $(IntermediateDirectory)/main.cpp$(PreprocessSuffix): main.cpp
 	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/main.cpp$(PreprocessSuffix) main.cpp
 
 $(IntermediateDirectory)/up_include_glad_glad.c$(ObjectSuffix): ../include/glad/glad.c $(IntermediateDirectory)/up_include_glad_glad.c$(DependSuffix)
-	$(CC) $(SourceSwitch) "D:/Home/Documenti/Repos/RTGP_Project/include/glad/glad.c" $(CFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/up_include_glad_glad.c$(ObjectSuffix) $(IncludePath)
+	$(CC) $(SourceSwitch) "D:/Home/Documenti/Repos/GL_Ninja/RTGP_Project/include/glad/glad.c" $(CFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/up_include_glad_glad.c$(ObjectSuffix) $(IncludePath)
 $(IntermediateDirectory)/up_include_glad_glad.c$(DependSuffix): ../include/glad/glad.c
 	@$(CC) $(CFLAGS) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/up_include_glad_glad.c$(ObjectSuffix) -MF$(IntermediateDirectory)/up_include_glad_glad.c$(DependSuffix) -MM ../include/glad/glad.c
 
