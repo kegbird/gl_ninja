@@ -75,6 +75,8 @@ positive Z axis points "outside" the screen
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image/stb_image.h>
 
+#include<btBulletDynamicsCommon.h>
+
 // number of lights in the scene
 #define NR_LIGHTS 3
 #define N_MODELS 5
@@ -87,7 +89,9 @@ GLuint screenWidth = 1280, screenHeight = 720;
 // callback functions for keyboard and mouse events
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
-GLint LoadTexture(const char* path);
+void setupPhysics();
+void deletePhysics();
+GLint loadTexture(const char* path);
 
 // we initialize an array of booleans for each keybord key
 bool keys[1024];
@@ -104,18 +108,6 @@ GLfloat lastFrame = 0.0f;
 // boolean to activate/deactivate wireframe rendering
 GLboolean wireframe = GL_FALSE;
 
-// enum data structure to manage indices for shaders swapping
-enum available_ShaderPrograms{ BLINN_PHONG_TEX_ML, GGX_TEX_ML};
-// strings with shaders names to print the name of the current one on console
-const char * print_available_ShaderPrograms[] = { "BLINN-PHONG-TEX-ML", "GGX-TEX-ML"};
-
-// index of the current shader (= 0 in the beginning)
-GLuint current_program = BLINN_PHONG_TEX_ML;
-// a vector for all the Shader Programs used and swapped in the application
-vector<Shader> shaders;
-
-// Uniforms to be passed to shaders
-// pointlights positions
 glm::vec3 lightPositions[] = {
     glm::vec3(5.0f, 10.0f, 10.0f),
     glm::vec3(-5.0f, 10.0f, 10.0f),
@@ -149,7 +141,14 @@ vector<GLint> textureID;
 // UV repetitions
 GLfloat repeat = 1.0;
 
-/////////////////// MAIN function ///////////////////////
+float gravity=-10;
+btDefaultCollisionConfiguration* collisionConfiguration;
+btCollisionDispatcher* dispatcher;
+btBroadphaseInterface* overlappingPairCache;
+btSequentialImpulseConstraintSolver* solver;
+btDiscreteDynamicsWorld* dynamicsWorld; 
+btAlignedObjectArray<btCollisionShape*> collisionShapes;
+
 int main()
 {
 	srand(time(0));
@@ -158,10 +157,8 @@ int main()
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-	// we set if the window is resizable
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
-
-	// we create the application's window
+	
     GLFWwindow* window = glfwCreateWindow(screenWidth, screenHeight, "GL_Ninja", nullptr, nullptr);
     if (!window)
     {
@@ -197,20 +194,47 @@ int main()
     //the "clear" color for the frame buffer
     glClearColor(0.26f, 0.46f, 0.98f, 1.0f);
 
-    // we create the Shader Program used for the plane (fixed)
-    Shader planeShader("18_phong_tex_multiplelights.vert", "19a_blinnphong_tex_multiplelights.frag");
-	Shader objectShader("lambert.vert", "lambert.frag");
-	
 	array<Model, N_MODELS> models={Model("../../models/cube.obj"),
 			Model("../../models/cone.obj"),
 			Model("../../models/torus.obj"),
 			Model("../../models/icosphere.obj"),
 			Model("../../models/sphere.obj")};
+
+    // we create the Shader Program used for the plane (fixed)
+    Shader planeShader("18_phong_tex_multiplelights.vert", "19a_blinnphong_tex_multiplelights.frag");
+	Shader objectShader("lambert.vert", "lambert.frag");
 	
     Model planeModel("../../models/plane.obj");
 
     // we load the images and store them in a vector
-    textureID.push_back(LoadTexture("../../textures/SoilCracked.png"));
+    textureID.push_back(loadTexture("../../textures/SoilCracked.png"));
+	
+	setupPhysics();
+	
+	for(unsigned int i=0;i<models.size();i++)
+	{
+		for(unsigned int j=0;j<models[i].meshes.size();j++)
+		{
+			btConvexHullShape* meshCollisionShape = new btConvexHullShape();
+			for(unsigned int k=0;k<models[i].meshes[j].vertices.size();k++)
+			{
+				Vertex vertex = models[i].meshes[j].vertices[k];
+				meshCollisionShape->addPoint(btVector3(vertex.Position.x, vertex.Position.y, vertex.Position.z));
+			}
+			
+			collisionShapes.push_back(meshCollisionShape);
+			btTransform startTransform;
+			startTransform.setIdentity();
+			btScalar mass(1.f);
+			btVector3 localInertia(0, 0, 0);
+			meshCollisionShape->calculateLocalInertia(mass, localInertia);
+			startTransform.setOrigin(btVector3(0, 0, 0));
+			btDefaultMotionState* motionState = new btDefaultMotionState(startTransform);
+			btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, meshCollisionShape, localInertia);
+			btRigidBody* body = new btRigidBody(rbInfo);
+			dynamicsWorld->addRigidBody(body);
+		}
+	}
 
     // Projection matrix: FOV angle, aspect ratio, near and far planes
     glm::mat4 projection = glm::perspective(45.0f, (float)screenWidth/(float)screenHeight, 0.1f, 10000.0f);
@@ -228,7 +252,9 @@ int main()
         glfwPollEvents();
         // we "clear" the frame and z buffer
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+		
+		dynamicsWorld->stepSimulation(1.f / 60.f, 10);
+		
         // we set the rendering mode
         if (wireframe)
             // Draw in wireframe
@@ -343,16 +369,32 @@ int main()
 	
 	planeShader.Delete();
 	objectShader.Delete();
-	
-    // we close and delete the created context
+	deletePhysics();
     glfwTerminate();
     return 0;
 }
 
+void setupPhysics()
+{
+	collisionConfiguration = new btDefaultCollisionConfiguration();
+	dispatcher = new btCollisionDispatcher(collisionConfiguration);
+	overlappingPairCache = new btDbvtBroadphase();
+	solver = new btSequentialImpulseConstraintSolver;
+	dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration);
+	dynamicsWorld->setGravity(btVector3(0, gravity, 0));	
+}
 
-//////////////////////////////////////////
-// we load the image from disk and we create an OpenGL texture
-GLint LoadTexture(const char* path)
+void deletePhysics()
+{
+	delete dynamicsWorld;
+	delete solver;
+	delete overlappingPairCache;
+	delete dispatcher;
+	delete collisionConfiguration;
+	collisionShapes.clear();
+}
+
+GLint loadTexture(const char* path)
 {
     GLuint textureImage;
     int w, h, channels;
@@ -384,8 +426,6 @@ GLint LoadTexture(const char* path)
 
 }
 
-//////////////////////////////////////////
-// callback for keyboard events
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)
 {
     // if ESC is pressed, we close the application
@@ -402,8 +442,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         keys[key] = false;
 }
 
-//////////////////////////////////////////
-// callback for mouse events
 void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
       // we move the camera view following the mouse cursor
