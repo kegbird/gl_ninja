@@ -41,13 +41,10 @@ positive Z axis points "outside" the screen
     #define __USE_MINGW_ANSI_STDIO 0
 #endif
 // Std. Includes
+#include <time.h>
 #include <string>
+#include <cstdlib>
 
-// Loader for OpenGL extensions
-// http://glad.dav1d.de/
-// THIS IS OPTIONAL AND NOT REQUIRED, ONLY USE THIS IF YOU DON'T WANT GLAD TO INCLUDE windows.h
-// GLAD will include windows.h for APIENTRY if it was not previously defined.
-// Make sure you have the correct definition for APIENTRY for platforms which define _WIN32 but don't use __stdcall
 #ifdef _WIN32
     #define APIENTRY __stdcall
 #endif
@@ -78,10 +75,11 @@ positive Z axis points "outside" the screen
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image/stb_image.h>
 
-#include<btBulletDynamicsCommon.h>
-
 // number of lights in the scene
 #define NR_LIGHTS 3
+#define N_MODELS 5
+#define DELAY 2.f
+#define RAND_MAX 256
 
 // dimensions of application's window
 GLuint screenWidth = 1280, screenHeight = 720;
@@ -89,26 +87,13 @@ GLuint screenWidth = 1280, screenHeight = 720;
 // callback functions for keyboard and mouse events
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
-
-// setup of Shader Programs for the shaders used in the application
-void SetupShaders();
-// delete Shader Programs whan application ends
-void DeleteShaders();
-// print on console the name of current shader
-void PrintCurrentShader(int shader);
-
-// load image from disk and create an OpenGL texture
 GLint LoadTexture(const char* path);
-
-//Setup Bullet Physics
-void SetUpPhysics();
-void DeletePhysics();
 
 // we initialize an array of booleans for each keybord key
 bool keys[1024];
 
 // we set the initial position of mouse cursor in the application window
-GLfloat lastX = 800, lastY = 600;
+GLfloat lastX = 400, lastY = 300;
 // when rendering the first frame, we do not have a "previous state" for the mouse, so we need to manage this situation
 bool firstMouse = true;
 
@@ -116,16 +101,13 @@ bool firstMouse = true;
 GLfloat deltaTime = 0.0f;
 GLfloat lastFrame = 0.0f;
 
-// rotation angle on Y axis
-GLfloat orientationY = 0.0f;
-
 // boolean to activate/deactivate wireframe rendering
 GLboolean wireframe = GL_FALSE;
 
 // enum data structure to manage indices for shaders swapping
-enum available_ShaderPrograms{ BLINN_PHONG_TEX_ML };
+enum available_ShaderPrograms{ BLINN_PHONG_TEX_ML, GGX_TEX_ML};
 // strings with shaders names to print the name of the current one on console
-const char * print_available_ShaderPrograms[] = { "BLINN-PHONG-TEX-ML" };
+const char * print_available_ShaderPrograms[] = { "BLINN-PHONG-TEX-ML", "GGX-TEX-ML"};
 
 // index of the current shader (= 0 in the beginning)
 GLuint current_program = BLINN_PHONG_TEX_ML;
@@ -143,6 +125,8 @@ glm::vec3 lightPositions[] = {
 // specular and ambient components
 GLfloat specularColor[] = {1.0,1.0,1.0};
 GLfloat ambientColor[] = {0.1,0.1,0.1};
+GLfloat diffuseColor[] = {1.0f,0.0f,0.0f};
+
 // weights for the diffusive, specular and ambient components
 GLfloat Kd = 0.8f;
 GLfloat Ks = 0.5f;
@@ -162,114 +146,124 @@ GLfloat F0 = 0.9f;
 
 // vector for the textures IDs
 vector<GLint> textureID;
-
 // UV repetitions
 GLfloat repeat = 1.0;
 
-//Bullet variables
-btDefaultCollisionConfiguration* collisionConfiguration;
-
-btCollisionDispatcher* dispatcher;
-
-btBroadphaseInterface * overlappingPairCache;
-
-btSequentialImpulseConstraintSolver* solver;
-
-btDiscreteDynamicsWorld* dynamicsWorld;
-
-btAlignedObjectArray<btCollisionShape*> collisionShapes;
-
-btCollisionShape* groundShape;
-
-btCollisionShape* cubeShape;
-
+/////////////////// MAIN function ///////////////////////
 int main()
 {
-	SetUpPhysics();
-  glfwInit();
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-  glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+	srand(time(0));
+	glfwInit();
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+	// we set if the window is resizable
+	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-  // we create the application's window
+	// we create the application's window
     GLFWwindow* window = glfwCreateWindow(screenWidth, screenHeight, "GL_Ninja", nullptr, nullptr);
     if (!window)
     {
-        std::cout << "Failed to create GLFW window" << std::endl;
-        glfwTerminate();
-        return -1;
-    }
-    glfwMakeContextCurrent(window);
-
+		std::cout << "Failed to create GLFW window" << std::endl;
+		glfwTerminate();
+		return -1;
+	}
+	glfwMakeContextCurrent(window);
+	
+    // we put in relation the window and the callbacks
     glfwSetKeyCallback(window, key_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
 
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    // we disable the mouse cursor
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
+    // GLAD tries to load the context set by GLFW
     if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress))
     {
         std::cout << "Failed to initialize OpenGL context" << std::endl;
         return -1;
     }
 
+
     // we define the viewport dimensions
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
     glViewport(0, 0, width, height);
 
+    // we enable Z test
     glEnable(GL_DEPTH_TEST);
 
+    //the "clear" color for the frame buffer
     glClearColor(0.26f, 0.46f, 0.98f, 1.0f);
 
-    SetupShaders();
-
-    Shader plane_shader("phong_tex_multiplelights.vert", "blinnphong_tex_multiplelights.frag");
-
-    Model cubeModel("../../models/cube.obj");
+    // we create the Shader Program used for the plane (fixed)
+    Shader planeShader("18_phong_tex_multiplelights.vert", "19a_blinnphong_tex_multiplelights.frag");
+	Shader objectShader("lambert.vert", "lambert.frag");
+	
+	array<Model, N_MODELS> models={Model("../../models/cube.obj"),
+			Model("../../models/cone.obj"),
+			Model("../../models/torus.obj"),
+			Model("../../models/icosphere.obj"),
+			Model("../../models/sphere.obj")};
+	
     Model planeModel("../../models/plane.obj");
 
-    textureID.push_back(LoadTexture("../../textures/UV_Grid_Sm.png"));
+    // we load the images and store them in a vector
     textureID.push_back(LoadTexture("../../textures/SoilCracked.png"));
 
+    // Projection matrix: FOV angle, aspect ratio, near and far planes
     glm::mat4 projection = glm::perspective(45.0f, (float)screenWidth/(float)screenHeight, 0.1f, 10000.0f);
-	glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 1.0f, 7.0f), glm::vec3(0.0f, 1.0f, 7.0f) + glm::vec3(0,0,-1), glm::vec3(0,1,0));
-
-    // Rendering loop: this code is executed at each frame
+	glm::mat4 view = glm::lookAt(glm::vec3(0.f, 0.f, 7.f), glm::vec3(0.f, 0.f, 6.f), glm::vec3(0.f, 1.f, 0.f));
+    
+	GLfloat currentTime;
+	GLfloat lastTime=glfwGetTime();
+	GLfloat deltaTime;
+	int modelIndex=0;
+	
+	// Rendering loop: this code is executed at each frame
     while(!glfwWindowShouldClose(window))
     {
+        // Check is an I/O event is happening
         glfwPollEvents();
+        // we "clear" the frame and z buffer
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		
+
+        // we set the rendering mode
+        if (wireframe)
+            // Draw in wireframe
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        else
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			
         /////////////////// PLANE ////////////////////////////////////////////////
         // We render a plane under the objects. We apply the fullcolor shader to the plane, and we do not apply the rotation applied to the other objects.
-        plane_shader.Use();
+        planeShader.Use();
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, textureID[1]);
+        glBindTexture(GL_TEXTURE_2D, textureID[0]);
 
         // we pass projection and view matrices to the Shader Program of the plane
-        glUniformMatrix4fv(glGetUniformLocation(plane_shader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
-        glUniformMatrix4fv(glGetUniformLocation(plane_shader.Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(glGetUniformLocation(planeShader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
+        glUniformMatrix4fv(glGetUniformLocation(planeShader.Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
 
         // we determine the position in the Shader Program of the uniform variables
-        GLint kdLocation = glGetUniformLocation(plane_shader.Program, "Kd");
-        GLint textureLocation = glGetUniformLocation(plane_shader.Program, "tex");
-        GLint repeatLocation = glGetUniformLocation(plane_shader.Program, "repeat");
-        GLint matAmbientLocation = glGetUniformLocation(plane_shader.Program, "ambientColor");
-        GLint matSpecularLocation = glGetUniformLocation(plane_shader.Program, "specularColor");
-        GLint kaLocation = glGetUniformLocation(plane_shader.Program, "Ka");
-        GLint ksLocation = glGetUniformLocation(plane_shader.Program, "Ks");
-        GLint shineLocation = glGetUniformLocation(plane_shader.Program, "shininess");
-        GLint constantLocation = glGetUniformLocation(plane_shader.Program, "constant");
-        GLint linearLocation = glGetUniformLocation(plane_shader.Program, "linear");
-        GLint quadraticLocation = glGetUniformLocation(plane_shader.Program, "quadratic");
+        GLint kdLocation = glGetUniformLocation(planeShader.Program, "Kd");
+        GLint textureLocation = glGetUniformLocation(planeShader.Program, "tex");
+        GLint repeatLocation = glGetUniformLocation(planeShader.Program, "repeat");
+        GLint matAmbientLocation = glGetUniformLocation(planeShader.Program, "ambientColor");
+        GLint matSpecularLocation = glGetUniformLocation(planeShader.Program, "specularColor");
+        GLint kaLocation = glGetUniformLocation(planeShader.Program, "Ka");
+        GLint ksLocation = glGetUniformLocation(planeShader.Program, "Ks");
+        GLint shineLocation = glGetUniformLocation(planeShader.Program, "shininess");
+        GLint constantLocation = glGetUniformLocation(planeShader.Program, "constant");
+        GLint linearLocation = glGetUniformLocation(planeShader.Program, "linear");
+        GLint quadraticLocation = glGetUniformLocation(planeShader.Program, "quadratic");
 
         // we pass each light position to the shader
         for (GLuint i = 0; i < NR_LIGHTS; i++)
         {
             string number = to_string(i);
-            glUniform3fv(glGetUniformLocation(plane_shader.Program, ("lights[" + number + "]").c_str()), 1, glm::value_ptr(lightPositions[i]));
+            glUniform3fv(glGetUniformLocation(planeShader.Program, ("lights[" + number + "]").c_str()), 1, glm::value_ptr(lightPositions[i]));
         }
 
         // we assign the value to the uniform variables
@@ -288,36 +282,73 @@ int main()
         // we create the transformation matrix by defining the Euler's matrices, and the matrix for normals transformation
         glm::mat4 planeModelMatrix;
         glm::mat3 planeNormalMatrix;
-		
         planeModelMatrix = glm::scale(planeModelMatrix, glm::vec3(10.0f, 10.0f, 1.0f));
-		planeModelMatrix = glm::rotate(planeModelMatrix, glm::radians(90.f), glm::vec3(1.f,0.f,0.f));
-        planeModelMatrix = glm::translate(planeModelMatrix, glm::vec3(0.0f, -6.0f, 0.0f));
+		planeModelMatrix = glm::rotate(planeModelMatrix, glm::radians(90.f),glm::vec3(1.f, 0.f, 0.f));
+        planeModelMatrix = glm::translate(planeModelMatrix, glm::vec3(0.0f, -5.0f, 0.0f));
         planeNormalMatrix = glm::inverseTranspose(glm::mat3(view*planeModelMatrix));
-        glUniformMatrix4fv(glGetUniformLocation(plane_shader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(planeModelMatrix));
-        glUniformMatrix3fv(glGetUniformLocation(plane_shader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(planeNormalMatrix));
+        glUniformMatrix4fv(glGetUniformLocation(planeShader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(planeModelMatrix));
+        glUniformMatrix3fv(glGetUniformLocation(planeShader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(planeNormalMatrix));
 
-        planeModel.Draw(plane_shader);
+        // we render the plane
+        planeModel.Draw(planeShader);
+		
+        currentTime = glfwGetTime();
+        deltaTime = currentTime - lastTime;
+		
+		if(deltaTime>DELAY)
+		{
+			lastTime=glfwGetTime();
+			currentTime=lastTime;
+			GLfloat red=(GLfloat)((GLfloat)(rand()%RAND_MAX)/(GLfloat)RAND_MAX);
+			GLfloat green=(GLfloat)((GLfloat)(rand()%RAND_MAX)/(GLfloat)RAND_MAX);
+			GLfloat blue=(GLfloat)((GLfloat)(rand()%RAND_MAX)/(GLfloat)RAND_MAX);
+			
+			diffuseColor[0]=red;
+			diffuseColor[1]=green;
+			diffuseColor[2]=blue;
+			
+			modelIndex++;
+			modelIndex = modelIndex%N_MODELS;
+		}
+		
+		objectShader.Use();
+        // we pass projection and view matrices to the Shader Program of the plane
+        glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
+        glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
 
+        // we determine the position in the Shader Program of the uniform variables
+        GLint pointLightLocation = glGetUniformLocation(objectShader.Program, "pointLightPosition");
+        GLint objectDiffuseLocation = glGetUniformLocation(objectShader.Program, "diffuseColor");
+        GLint kdObjectLocation = glGetUniformLocation(objectShader.Program, "Kd");
+
+        // we assign the value to the uniform variables
+        glUniform3fv(pointLightLocation, 1, glm::value_ptr(lightPositions[0]));
+        glUniform3fv(objectDiffuseLocation, 1, diffuseColor);
+        glUniform1f(kdObjectLocation, Kd);
+
+        // we create the transformation matrix by defining the Euler's matrices, and the matrix for normals transformation
+        glm::mat4 objectModelMatrix;
+        glm::mat3 objectNormalMatrix;
+        objectModelMatrix = glm::translate(objectModelMatrix, glm::vec3(0.0f, 0.0f, 0.0f));
+		objectModelMatrix = glm::rotate(objectModelMatrix, glm::radians(0.f), glm::vec3(0.f,1.f,0.f));
+        objectModelMatrix = glm::scale(objectModelMatrix, glm::vec3(0.8f, 0.8f, 0.8f));
+        objectNormalMatrix = glm::inverseTranspose(glm::mat3(view*objectModelMatrix));
+        glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(objectModelMatrix));
+        glUniformMatrix3fv(glGetUniformLocation(objectShader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(objectNormalMatrix));
+		
+		models.at(modelIndex).Draw(objectShader);
+		
         glfwSwapBuffers(window);
     }
-
-    DeleteShaders();
-	DeletePhysics();
+	
+	planeShader.Delete();
+	objectShader.Delete();
+	
+    // we close and delete the created context
     glfwTerminate();
     return 0;
 }
 
-
-//////////////////////////////////////////
-// we create and compile shaders (code of Shader class is in include/utils/shader_v1.h), and we add them to the list of available shaders
-void SetupShaders()
-{
-  // we create the Shader Programs (code in shader_v1.h)
-    Shader shader1("18_phong_tex_multiplelights.vert", "19a_blinnphong_tex_multiplelights.frag");
-    shaders.push_back(shader1);
-    Shader shader2("18_phong_tex_multiplelights.vert", "19b_ggx_tex_multiplelights.frag");
-    shaders.push_back(shader2);
-}
 
 //////////////////////////////////////////
 // we load the image from disk and we create an OpenGL texture
@@ -348,116 +379,48 @@ GLint LoadTexture(const char* path)
 
     // we free the memory once we have created an OpenGL texture
     stbi_image_free(image);
+
     return textureImage;
-}
 
-/////////////////////////////////////////
-// we delete all the Shaders Programs
-void DeleteShaders()
-{
-    for(GLuint i = 0; i < shaders.size(); i++)
-        shaders[i].Delete();
-}
-
-//////////////////////////////////////////
-// we print on console the name of the currently used shader
-void PrintCurrentShader(int shader)
-{
-    std::cout << "Current shader:" << print_available_ShaderPrograms[shader]  << std::endl;
 }
 
 //////////////////////////////////////////
 // callback for keyboard events
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)
 {
-		if(key == GLFW_KEY_SPACE && action == GLFW_PRESS)
-		{
-				printf("Applying impulse to the cube!\n");
-				btCollisionObject* obj = dynamicsWorld->getCollisionObjectArray()[0];
-				btRigidBody* body = btRigidBody::upcast(obj);
-				body->applyForce(btVector3(-5000.f,+10000.f,0.f),btVector3(-1,0,0));
-		}
     // if ESC is pressed, we close the application
     if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
+
     // if L is pressed, we activate/deactivate wireframe rendering of models
     if(key == GLFW_KEY_L && action == GLFW_PRESS)
         wireframe=!wireframe;
-
-    // pressing a key between 1 and 2, we change the shader applied to the models
-    if((key >= GLFW_KEY_1 && key <= GLFW_KEY_2) && action == GLFW_PRESS)
-    {
-        // "1" to "2" -> ASCII codes from 49 to 50
-        // we subtract 48 (= ASCII CODE of "0") to have integers from 1 to 2
-        // we subtract 1 to have indices from 0 to 1 in the shaders list
-        current_program = (key-'0'-1);
-        PrintCurrentShader(current_program);
-    }
-    // we keep trace of the pressed keys
-    // with this method, we can manage 2 keys pressed at the same time:
-    // many I/O managers often consider only 1 key pressed at the time (the first pressed, until it is released)
-    // using a boolean array, we can then check and manage all the keys pressed at the same time
+		
     if(action == GLFW_PRESS)
         keys[key] = true;
     else if(action == GLFW_RELEASE)
         keys[key] = false;
 }
 
+//////////////////////////////////////////
 // callback for mouse events
 void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
+      // we move the camera view following the mouse cursor
+      // we calculate the offset of the mouse cursor from the position in the last frame
+      // when rendering the first frame, we do not have a "previous state" for the mouse, so we set the previous state equal to the initial values (thus, the offset will be = 0)
+      if(firstMouse)
+      {
+          lastX = xpos;
+          lastY = ypos;
+          firstMouse = false;
+      }
+
+      // offset of mouse cursor position
+      GLfloat xoffset = xpos - lastX;
+      GLfloat yoffset = lastY - ypos;
+
+      // the new position will be the previous one for the next frame
+      lastX = xpos;
+      lastY = ypos;
 }
-
-void SetUpPhysics()
-{
-	collisionConfiguration = new btDefaultCollisionConfiguration();
-	
-	dispatcher = new btCollisionDispatcher (collisionConfiguration);
-	
-	overlappingPairCache = new btDbvtBroadphase ();
-	
-	solver = new btSequentialImpulseConstraintSolver;
-	
-	dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration );
-	
-	dynamicsWorld -> setGravity (btVector3 (0 , -10 ,0));
-	
-	cubeShape = new btBoxShape(btVector3(btScalar(1.0),btScalar(1.0),btScalar(1.0)));
-	
-	collisionShapes.push_back(cubeShape);
-	
-	btTransform cubeTransform;
-	
-	cubeTransform.setIdentity();
-	
-	cubeTransform.setOrigin(btVector3(5.0,1.0,0.0));
-	
-	btScalar mass(10.0);
-	
-	btVector3 localInertia(0,0,0);
-	
-	cubeShape->calculateLocalInertia(mass, localInertia);
-	
-	btDefaultMotionState* myMotionState = new btDefaultMotionState(cubeTransform);
-	btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, myMotionState, cubeShape, localInertia);
-	btRigidBody* body = new btRigidBody(rbInfo);
-
-	//add the body to the dynamics world
-	dynamicsWorld->addRigidBody(body);
-}
-
-void DeletePhysics()
-{
-	delete dynamicsWorld;
-	
-	delete solver;
-	
-	delete overlappingPairCache;
-	
-	delete dispatcher;
-	
-	delete collisionConfiguration;
-	
-	collisionShapes.clear();
-}
-

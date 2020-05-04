@@ -67,7 +67,7 @@ public:
     vector<Vertex> vertices;
     vector<GLuint> indices;
     vector<Texture> textures;
-	Material materials;
+	Material material;
     GLuint VAO;
 
     //////////////////////////////////////////
@@ -79,12 +79,12 @@ public:
         this->textures = textures;
 		this->setupMesh();
 	}
-    Mesh(vector<Vertex> vertices, vector<GLuint> indices, vector<Texture> textures, Material materials)
+    Mesh(vector<Vertex> vertices, vector<GLuint> indices, vector<Texture> textures, Material material)
     {
         this->vertices = vertices;
         this->indices = indices;
         this->textures = textures;
-		this->materials=materials;
+		this->material=material;
         this->setupMesh();
     }
 
@@ -114,6 +114,7 @@ public:
              else if(name == "texture_height")
                 ss << heightNr++; // Transfer GLuint to stream
             number = ss.str();
+			
             // Now set the sampler to the correct texture unit
             glUniform1i(glGetUniformLocation(shader.Program, (name + number).c_str()), i);
             // And finally bind the texture
