@@ -80,8 +80,9 @@ positive Z axis points "outside" the screen
 // number of lights in the scene
 #define NR_LIGHTS 3
 #define N_MODELS 5
-#define DELAY 2.f
-#define RAND_MAX 256
+#define DELAY 1.f
+#define COLOR_LIMIT 256
+#define X_BOUNDARY 7
 
 // dimensions of application's window
 GLuint screenWidth = 1280, screenHeight = 720;
@@ -90,6 +91,8 @@ GLuint screenWidth = 1280, screenHeight = 720;
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void setupPhysics();
+void addRigidBody(int i);
+void removeRigidBody(int i);
 void deletePhysics();
 GLint loadTexture(const char* path);
 
@@ -223,16 +226,6 @@ int main()
 			}
 			
 			collisionShapes.push_back(meshCollisionShape);
-			btTransform startTransform;
-			startTransform.setIdentity();
-			btScalar mass(1.f);
-			btVector3 localInertia(0, 0, 0);
-			meshCollisionShape->calculateLocalInertia(mass, localInertia);
-			startTransform.setOrigin(btVector3(0, 0, 0));
-			btDefaultMotionState* motionState = new btDefaultMotionState(startTransform);
-			btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, meshCollisionShape, localInertia);
-			btRigidBody* body = new btRigidBody(rbInfo);
-			dynamicsWorld->addRigidBody(body);
 		}
 	}
 
@@ -245,7 +238,11 @@ int main()
 	GLfloat deltaTime;
 	int modelIndex=0;
 	
-	// Rendering loop: this code is executed at each frame
+	btRigidBody* rigidBody;
+	float glmTransform[16];
+	
+	addRigidBody(modelIndex);
+	
     while(!glfwWindowShouldClose(window))
     {
         // Check is an I/O event is happening
@@ -323,11 +320,12 @@ int main()
 		
 		if(deltaTime>DELAY)
 		{
+			removeRigidBody(0);
 			lastTime=glfwGetTime();
 			currentTime=lastTime;
-			GLfloat red=(GLfloat)((GLfloat)(rand()%RAND_MAX)/(GLfloat)RAND_MAX);
-			GLfloat green=(GLfloat)((GLfloat)(rand()%RAND_MAX)/(GLfloat)RAND_MAX);
-			GLfloat blue=(GLfloat)((GLfloat)(rand()%RAND_MAX)/(GLfloat)RAND_MAX);
+			GLfloat red=(GLfloat)((GLfloat)(rand()%COLOR_LIMIT)/(GLfloat)COLOR_LIMIT);
+			GLfloat green=(GLfloat)((GLfloat)(rand()%COLOR_LIMIT)/(GLfloat)COLOR_LIMIT);
+			GLfloat blue=(GLfloat)((GLfloat)(rand()%COLOR_LIMIT)/(GLfloat)COLOR_LIMIT);
 			
 			diffuseColor[0]=red;
 			diffuseColor[1]=green;
@@ -335,6 +333,7 @@ int main()
 			
 			modelIndex++;
 			modelIndex = modelIndex%N_MODELS;
+			addRigidBody(modelIndex);
 		}
 		
 		objectShader.Use();
@@ -352,12 +351,39 @@ int main()
         glUniform3fv(objectDiffuseLocation, 1, diffuseColor);
         glUniform1f(kdObjectLocation, Kd);
 
+		btCollisionObject* collisionObject = dynamicsWorld->getCollisionObjectArray()[0];
+		rigidBody = btRigidBody::upcast(collisionObject);
+		
+		btTransform transform;
+		if (rigidBody && rigidBody->getMotionState())
+		{
+			rigidBody->getMotionState()->getWorldTransform(transform);
+		}
+		else
+		{
+			transform = collisionObject->getWorldTransform();
+		}
+		
+		transform.getOpenGLMatrix(glmTransform);
+		
         // we create the transformation matrix by defining the Euler's matrices, and the matrix for normals transformation
-        glm::mat4 objectModelMatrix;
+        glm::mat4 objectModelMatrix=glm::mat4(glmTransform[0],
+												glmTransform[1],
+												glmTransform[2],
+												glmTransform[3],
+												glmTransform[4],
+												glmTransform[5],
+												glmTransform[6],
+												glmTransform[7],
+												glmTransform[8],
+												glmTransform[9],
+												glmTransform[10],
+												glmTransform[11],
+												glmTransform[12],
+												glmTransform[13],
+												glmTransform[14],
+												glmTransform[15]);
         glm::mat3 objectNormalMatrix;
-        objectModelMatrix = glm::translate(objectModelMatrix, glm::vec3(0.0f, 0.0f, 0.0f));
-		objectModelMatrix = glm::rotate(objectModelMatrix, glm::radians(0.f), glm::vec3(0.f,1.f,0.f));
-        objectModelMatrix = glm::scale(objectModelMatrix, glm::vec3(0.8f, 0.8f, 0.8f));
         objectNormalMatrix = glm::inverseTranspose(glm::mat3(view*objectModelMatrix));
         glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(objectModelMatrix));
         glUniformMatrix3fv(glGetUniformLocation(objectShader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(objectNormalMatrix));
@@ -382,6 +408,33 @@ void setupPhysics()
 	solver = new btSequentialImpulseConstraintSolver;
 	dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration);
 	dynamicsWorld->setGravity(btVector3(0, gravity, 0));	
+}
+
+void addRigidBody(int i)
+{
+	btTransform startTransform;
+	startTransform.setIdentity();
+	btScalar mass(1.f);
+	btVector3 localInertia(0, 0, 0);
+	btCollisionShape* meshCollisionShape = collisionShapes[i];
+	meshCollisionShape->calculateLocalInertia(mass, localInertia);
+	
+	btScalar x = ((rand()%101)/101.f)*X_BOUNDARY;
+	btScalar y = -6;
+	btScalar z = 0;
+	
+	startTransform.setOrigin(btVector3(x, y, z));
+	btDefaultMotionState* motionState = new btDefaultMotionState(startTransform);
+	btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, meshCollisionShape, localInertia);
+	btRigidBody* body = new btRigidBody(rbInfo);
+	dynamicsWorld->addRigidBody(body);
+}
+
+void removeRigidBody(int i)
+{
+	btCollisionObject* collisionObject = dynamicsWorld->getCollisionObjectArray()[i];
+	btRigidBody* rigidBody = btRigidBody::upcast(collisionObject);
+	dynamicsWorld->removeRigidBody(rigidBody);
 }
 
 void deletePhysics()
@@ -423,7 +476,6 @@ GLint loadTexture(const char* path)
     stbi_image_free(image);
 
     return textureImage;
-
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)
