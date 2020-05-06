@@ -80,35 +80,33 @@ positive Z axis points "outside" the screen
 // number of lights in the scene
 #define NR_LIGHTS 3
 #define N_MODELS 5
-#define DELAY 1.f
+#define DELAY 3.f
 #define COLOR_LIMIT 256
-#define X_BOUNDARY 7
+#define X_BOUNDARY 6
+#define X_IMPULSE_BOUNDARY 2
+#define Y_IMPULSE_BOUNDARY 13
 
-// dimensions of application's window
 GLuint screenWidth = 1280, screenHeight = 720;
 
-// callback functions for keyboard and mouse events
+void drawIndicatorLine();
+void drawCutPlane();
+void setupCursor(GLFWwindow* window, const char* path);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
-void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+void mouse_movement_callback(GLFWwindow* window, double xpos, double ypos);
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 void setupPhysics();
 void addRigidBody(int i);
 void removeRigidBody(int i);
 void deletePhysics();
 GLint loadTexture(const char* path);
 
-// we initialize an array of booleans for each keybord key
 bool keys[1024];
 
-// we set the initial position of mouse cursor in the application window
 GLfloat lastX = 400, lastY = 300;
-// when rendering the first frame, we do not have a "previous state" for the mouse, so we need to manage this situation
 bool firstMouse = true;
+bool pressing = false;
+bool cut=false;
 
-// parameters for time calculation (for animations)
-GLfloat deltaTime = 0.0f;
-GLfloat lastFrame = 0.0f;
-
-// boolean to activate/deactivate wireframe rendering
 GLboolean wireframe = GL_FALSE;
 
 glm::vec3 lightPositions[] = {
@@ -117,32 +115,28 @@ glm::vec3 lightPositions[] = {
     glm::vec3(5.0f, 10.0f, -10.0f),
 };
 
-// specular and ambient components
 GLfloat specularColor[] = {1.0,1.0,1.0};
 GLfloat ambientColor[] = {0.1,0.1,0.1};
 GLfloat diffuseColor[] = {1.0f,0.0f,0.0f};
 
-// weights for the diffusive, specular and ambient components
 GLfloat Kd = 0.8f;
 GLfloat Ks = 0.5f;
 GLfloat Ka = 0.1f;
-// shininess coefficient for Blinn-Phong shader
 GLfloat shininess = 25.0f;
-
-// attenuation parameters for Blinn-Phong shader
 GLfloat constant = 1.0f;
 GLfloat linear = 0.02f;
 GLfloat quadratic = 0.001f;
-
-// roughness index for Cook-Torrance shader
 GLfloat alpha = 0.2f;
-// Fresnel reflectance at 0 degree (Schlik's approximation)
 GLfloat F0 = 0.9f;
-
-// vector for the textures IDs
 vector<GLint> textureID;
-// UV repetitions
 GLfloat repeat = 1.0;
+
+GLFWcursor* cursor;
+
+GLfloat vertices[] = {0, 0, 0, 0};
+GLuint indices[] = { 0, 1 };
+glm::vec2 startCut;
+glm::vec2 endCut;
 
 float gravity=-10;
 btDefaultCollisionConfiguration* collisionConfiguration;
@@ -171,12 +165,11 @@ int main()
 	}
 	glfwMakeContextCurrent(window);
 	
-    // we put in relation the window and the callbacks
+	setupCursor(window, "../../cursor/cross_cursor.png");
+	
     glfwSetKeyCallback(window, key_callback);
-    glfwSetCursorPosCallback(window, mouse_callback);
-
-    // we disable the mouse cursor
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_movement_callback);
+	glfwSetMouseButtonCallback(window, mouse_button_callback);
 
     // GLAD tries to load the context set by GLFW
     if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress))
@@ -184,7 +177,6 @@ int main()
         std::cout << "Failed to initialize OpenGL context" << std::endl;
         return -1;
     }
-
 
     // we define the viewport dimensions
     int width, height;
@@ -242,6 +234,21 @@ int main()
 	float glmTransform[16];
 	
 	addRigidBody(modelIndex);
+	
+	/*GLuint VBOLine, VAOLine, EBOLine;
+    glGenVertexArrays(1, &VBOLine);
+    glGenBuffers(1, &VBOLine);
+    glGenBuffers(1, &EBOLine);
+    // Bind the Vertex Array Object first, then bind and set vertex buffer(s) and attribute pointer(s).
+    glBindVertexArray(VAOLine);
+    glBindBuffer(GL_ARRAY_BUFFER, VBOLine);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4, vertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBOLine);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLfloat)*2, indices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0); // Note that this is allowed, the call to glVertexAttribPointer registered VBO as the currently bound vertex buffer object so afterwards we can safely unbind
+    glBindVertexArray(0); // Unbind VAO (it's always a good thing to unbind any buffer/array to prevent strange bugs), remember: do NOT unbind the EBO, keep it bound to this VAO*/
 	
     while(!glfwWindowShouldClose(window))
     {
@@ -390,14 +397,72 @@ int main()
 		
 		models.at(modelIndex).Draw(objectShader);
 		
+		if(cut)
+			drawCutPlane();
+		
+		if(pressing)
+			drawIndicatorLine();
+			
         glfwSwapBuffers(window);
     }
 	
 	planeShader.Delete();
 	objectShader.Delete();
+	glfwDestroyCursor(cursor);
 	deletePhysics();
     glfwTerminate();
     return 0;
+}
+
+void drawIndicatorLine()
+{
+	GLuint VBO, VAO, EBO;
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
+    // Bind the Vertex Array Object first, then bind and set vertex buffer(s) and attribute pointer(s).
+    glBindVertexArray(VAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0); // Note that this is allowed, the call to glVertexAttribPointer registered VBO as the currently bound vertex buffer object so afterwards we can safely unbind
+
+    glBindVertexArray(0); // Unbind VAO (it's always a good thing to unbind any buffer/array to prevent strange bugs), remember: do NOT unbind the EBO, keep it bound to this VAO
+}
+
+void drawCutPlane()
+{
+	cut=false;
+}
+
+void setupCursor(GLFWwindow* window, const char* path)
+{
+	int w, h, channels;
+    unsigned char* imageData;
+    imageData = stbi_load(path, &w, &h, &channels, STBI_rgb_alpha);
+	
+    if (imageData == nullptr)
+	{
+        std::cout << "Failed to load cursor!" << std::endl;
+		return;
+	}
+	
+	GLFWimage image;
+	image.width = w;
+	image.height = h;
+	image.pixels = imageData;
+	GLFWcursor* cursor = glfwCreateCursor(&image, 0, 0);
+	
+	glfwSetCursor(window, cursor);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    stbi_image_free(imageData);
 }
 
 void setupPhysics()
@@ -419,15 +484,17 @@ void addRigidBody(int i)
 	btCollisionShape* meshCollisionShape = collisionShapes[i];
 	meshCollisionShape->calculateLocalInertia(mass, localInertia);
 	
-	btScalar x = ((rand()%101)/101.f)*X_BOUNDARY;
-	btScalar y = -6;
-	btScalar z = 0;
-	
-	startTransform.setOrigin(btVector3(x, y, z));
+	btScalar xModel = ((rand()%101)/101.f)*X_BOUNDARY * ((rand()%2)>0) ? 1 : -1;
+	btScalar yModel = -6;
+	startTransform.setOrigin(btVector3(xModel, yModel, 0));
 	btDefaultMotionState* motionState = new btDefaultMotionState(startTransform);
 	btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, meshCollisionShape, localInertia);
 	btRigidBody* body = new btRigidBody(rbInfo);
 	dynamicsWorld->addRigidBody(body);
+	
+	btScalar xImpulse = ((rand()%101)/101.f)*X_IMPULSE_BOUNDARY * ((rand()%2)>0) ? 1 : -1;
+	btScalar yImpulse = Y_IMPULSE_BOUNDARY;
+	body->applyImpulse(btVector3(xImpulse,yImpulse,0), btVector3(1,0,0));
 }
 
 void removeRigidBody(int i)
@@ -494,23 +561,32 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         keys[key] = false;
 }
 
-void mouse_callback(GLFWwindow* window, double xpos, double ypos)
+void mouse_movement_callback(GLFWwindow* window, double xpos, double ypos)
 {
-      // we move the camera view following the mouse cursor
-      // we calculate the offset of the mouse cursor from the position in the last frame
-      // when rendering the first frame, we do not have a "previous state" for the mouse, so we set the previous state equal to the initial values (thus, the offset will be = 0)
-      if(firstMouse)
-      {
-          lastX = xpos;
-          lastY = ypos;
-          firstMouse = false;
-      }
 
-      // offset of mouse cursor position
-      GLfloat xoffset = xpos - lastX;
-      GLfloat yoffset = lastY - ypos;
+}
 
-      // the new position will be the previous one for the next frame
-      lastX = xpos;
-      lastY = ypos;
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+{
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+	{
+		double xpos, ypos;
+		glfwGetCursorPos(window, &xpos, &ypos);
+		float x=(float)xpos;
+		float y=(float)ypos;
+		endCut=glm::vec2(x,y);
+        printf("Button pressed at %f,%f\n",x,y);
+		pressing=true;
+	}
+	else if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE )
+	{
+		double xpos, ypos;
+		glfwGetCursorPos(window, &xpos, &ypos);
+		float x=(float)xpos;
+		float y=(float)ypos;
+		endCut=glm::vec2(x,y);
+		printf("Button released at %f,%f\n",x,y);
+		pressing=false;
+		cut=true;
+	}
 }

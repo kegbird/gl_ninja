@@ -48,12 +48,6 @@ struct Vertex {
     glm::vec3 Bitangent;
 };
 
-struct Material {
-	glm::vec4 Ka;
-	glm::vec4 Kd;
-	glm::vec4 Ks;
-};
-
 // data structure for textures
 struct Texture {
     GLuint id;
@@ -67,7 +61,6 @@ public:
     vector<Vertex> vertices;
     vector<GLuint> indices;
     vector<Texture> textures;
-	Material material;
     GLuint VAO;
 
     //////////////////////////////////////////
@@ -79,15 +72,6 @@ public:
         this->textures = textures;
 		this->setupMesh();
 	}
-    Mesh(vector<Vertex> vertices, vector<GLuint> indices, vector<Texture> textures, Material material)
-    {
-        this->vertices = vertices;
-        this->indices = indices;
-        this->textures = textures;
-		this->material=material;
-        this->setupMesh();
-    }
-
     //////////////////////////////////////////
 
     // rendering of mesh

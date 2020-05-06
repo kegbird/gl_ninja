@@ -200,45 +200,7 @@ private:
             for(GLuint j = 0; j < face.mNumIndices; j++)
                 indices.push_back(face.mIndices[j]);
         }
-
-        // we process the materials defined in the model file
-        if(mesh->mMaterialIndex >= 0)
-        {
-            aiMaterial* aiMaterial = scene->mMaterials[mesh->mMaterialIndex];
-			Material material;
-			aiColor3D color;
-            // We assume a convention for sampler names in the shaders. Each diffuse texture should be named
-            // as 'texture_diffuseN' where N is a sequential number ranging from 1 to MAX_SAMPLER_NUMBER.
-            // Same applies to other texture as the following list summarizes:
-            // Diffuse: texture_diffuseN
-            // Specular: texture_specularN
-            // Normal: texture_normalN
-			aiMaterial->Get(AI_MATKEY_COLOR_AMBIENT, color);
-			material.Ka=glm::vec4(color.r, color.g, color.b, 1.0);
-			aiMaterial->Get(AI_MATKEY_COLOR_DIFFUSE, color);
-			material.Kd=glm::vec4(color.r, color.g, color.b, 1.0);
-			aiMaterial->Get(AI_MATKEY_COLOR_SPECULAR, color);
-			material.Ks=glm::vec4(color.r, color.g, color.b, 1.0);
-			
-            // 1. Diffuse maps
-            vector<Texture> diffuseMaps = this->loadMaterialTextures(aiMaterial, aiTextureType_DIFFUSE, "texture_diffuse");
-            textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
-            // 2. Specular maps
-            vector<Texture> specularMaps = this->loadMaterialTextures(aiMaterial, aiTextureType_SPECULAR, "texture_specular");
-            textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
-            // 3. Normal maps
-            std::vector<Texture> normalMaps = this->loadMaterialTextures(aiMaterial, aiTextureType_HEIGHT, "texture_normal");
-            textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
-            // 4. Height maps
-            std::vector<Texture> heightMaps = this->loadMaterialTextures(aiMaterial, aiTextureType_AMBIENT, "texture_height");
-            textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());
-			
-			return Mesh(vertices, indices, textures, material);
-        }
-		else
-		{
-			return Mesh(vertices, indices, textures);
-		}
+		return Mesh(vertices, indices, textures);
     }
 
     // Load (if not yet loaded) the textures defined in the model materials (if defined)
