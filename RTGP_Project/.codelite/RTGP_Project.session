@@ -1,33 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Session Name="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\RTGP_Project.workspace">
-  <int Value="1" Name="m_selectedTab"/>
+  <int Value="0" Name="m_selectedTab"/>
   <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\RTGP_Project.workspace" Name="m_workspaceName"/>
   <TabInfoArray Name="TabInfoArray">
     <TabInfo>
-      <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include\utils\model.h" Name="FileName"/>
-      <int Value="200" Name="FirstVisibleLine"/>
-      <int Value="201" Name="CurrentLine"/>
-      <wxArrayString Name="Bookmarks"/>
-      <IntVector Name="CollapsedFolds"/>
-    </TabInfo>
-    <TabInfo>
       <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\GL_Ninja\main.cpp" Name="FileName"/>
-      <int Value="228" Name="FirstVisibleLine"/>
-      <int Value="237" Name="CurrentLine"/>
+      <int Value="157" Name="FirstVisibleLine"/>
+      <int Value="165" Name="CurrentLine"/>
       <wxArrayString Name="Bookmarks"/>
       <IntVector Name="CollapsedFolds"/>
     </TabInfo>
     <TabInfo>
       <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include\utils\shader.h" Name="FileName"/>
-      <int Value="61" Name="FirstVisibleLine"/>
+      <int Value="62" Name="FirstVisibleLine"/>
       <int Value="63" Name="CurrentLine"/>
       <wxArrayString Name="Bookmarks"/>
       <IntVector Name="CollapsedFolds"/>
     </TabInfo>
     <TabInfo>
       <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include\utils\mesh.h" Name="FileName"/>
-      <int Value="60" Name="FirstVisibleLine"/>
-      <int Value="62" Name="CurrentLine"/>
+      <int Value="109" Name="FirstVisibleLine"/>
+      <int Value="111" Name="CurrentLine"/>
       <wxArrayString Name="Bookmarks">
         <wxString Value="0:3"/>
       </wxArrayString>
@@ -35,7 +28,7 @@
     </TabInfo>
     <TabInfo>
       <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include\bullet\BulletCollision\CollisionDispatch\btCollisionObject.h" Name="FileName"/>
-      <int Value="364" Name="FirstVisibleLine"/>
+      <int Value="365" Name="FirstVisibleLine"/>
       <int Value="366" Name="CurrentLine"/>
       <wxArrayString Name="Bookmarks"/>
       <IntVector Name="CollapsedFolds"/>
@@ -44,6 +37,20 @@
       <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include\bullet\BulletDynamics\Dynamics\btRigidBody.h" Name="FileName"/>
       <int Value="208" Name="FirstVisibleLine"/>
       <int Value="210" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+      <IntVector Name="CollapsedFolds"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\GL_Ninja\lineShader.vert" Name="FileName"/>
+      <int Value="0" Name="FirstVisibleLine"/>
+      <int Value="0" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+      <IntVector Name="CollapsedFolds"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\GL_Ninja\lineShader.frag" Name="FileName"/>
+      <int Value="0" Name="FirstVisibleLine"/>
+      <int Value="0" Name="CurrentLine"/>
       <wxArrayString Name="Bookmarks"/>
       <IntVector Name="CollapsedFolds"/>
     </TabInfo>

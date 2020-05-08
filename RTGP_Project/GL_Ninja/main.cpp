@@ -80,19 +80,18 @@ positive Z axis points "outside" the screen
 // number of lights in the scene
 #define NR_LIGHTS 3
 #define N_MODELS 5
-#define DELAY 3.f
 #define COLOR_LIMIT 256
 #define X_BOUNDARY 6
+#define Y_KILL -6
 #define X_IMPULSE_BOUNDARY 2
 #define Y_IMPULSE_BOUNDARY 13
 
 GLuint screenWidth = 1280, screenHeight = 720;
 
-void drawIndicatorLine();
+void drawIndicatorLine(Shader lineShader);
 void drawCutPlane();
-void setupCursor(GLFWwindow* window, const char* path);
+void setupIndicatorLineBuffers();
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
-void mouse_movement_callback(GLFWwindow* window, double xpos, double ypos);
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 void setupPhysics();
 void addRigidBody(int i);
@@ -106,6 +105,7 @@ GLfloat lastX = 400, lastY = 300;
 bool firstMouse = true;
 bool pressing = false;
 bool cut=false;
+const GLfloat maxSecPerFrame = 1.0f / 60.0f;
 
 GLboolean wireframe = GL_FALSE;
 
@@ -133,12 +133,12 @@ GLfloat repeat = 1.0;
 
 GLFWcursor* cursor;
 
-GLfloat vertices[] = {0, 0, 0, 0};
-GLuint indices[] = { 0, 1 };
-glm::vec2 startCut;
-glm::vec2 endCut;
+unsigned int VAOSegment, VBOSegment;
+GLfloat segmentVertices[] = {0.f, 0.f, 0.f, 1.f, 1.f, 0.f};
+GLuint segmentIndices[] = { 0, 1 };
 
-float gravity=-10;
+GLFWwindow* window;
+float gravity=-9.82f;
 btDefaultCollisionConfiguration* collisionConfiguration;
 btCollisionDispatcher* dispatcher;
 btBroadphaseInterface* overlappingPairCache;
@@ -156,7 +156,7 @@ int main()
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 	
-    GLFWwindow* window = glfwCreateWindow(screenWidth, screenHeight, "GL_Ninja", nullptr, nullptr);
+    window = glfwCreateWindow(screenWidth, screenHeight, "GL_Ninja", nullptr, nullptr);
     if (!window)
     {
 		std::cout << "Failed to create GLFW window" << std::endl;
@@ -165,10 +165,7 @@ int main()
 	}
 	glfwMakeContextCurrent(window);
 	
-	setupCursor(window, "../../cursor/cross_cursor.png");
-	
     glfwSetKeyCallback(window, key_callback);
-    glfwSetCursorPosCallback(window, mouse_movement_callback);
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
 
     // GLAD tries to load the context set by GLFW
@@ -188,16 +185,16 @@ int main()
 
     //the "clear" color for the frame buffer
     glClearColor(0.26f, 0.46f, 0.98f, 1.0f);
+		
+	Shader planeShader("18_phong_tex_multiplelights.vert", "19a_blinnphong_tex_multiplelights.frag");
+	Shader objectShader("lambert.vert", "lambert.frag");
+	Shader lineShader("lineShader.vert", "lineShader.frag");
 
 	array<Model, N_MODELS> models={Model("../../models/cube.obj"),
 			Model("../../models/cone.obj"),
 			Model("../../models/torus.obj"),
 			Model("../../models/icosphere.obj"),
 			Model("../../models/sphere.obj")};
-
-    // we create the Shader Program used for the plane (fixed)
-    Shader planeShader("18_phong_tex_multiplelights.vert", "19a_blinnphong_tex_multiplelights.frag");
-	Shader objectShader("lambert.vert", "lambert.frag");
 	
     Model planeModel("../../models/plane.obj");
 
@@ -225,9 +222,6 @@ int main()
     glm::mat4 projection = glm::perspective(45.0f, (float)screenWidth/(float)screenHeight, 0.1f, 10000.0f);
 	glm::mat4 view = glm::lookAt(glm::vec3(0.f, 0.f, 7.f), glm::vec3(0.f, 0.f, 6.f), glm::vec3(0.f, 1.f, 0.f));
     
-	GLfloat currentTime;
-	GLfloat lastTime=glfwGetTime();
-	GLfloat deltaTime;
 	int modelIndex=0;
 	
 	btRigidBody* rigidBody;
@@ -235,20 +229,11 @@ int main()
 	
 	addRigidBody(modelIndex);
 	
-	/*GLuint VBOLine, VAOLine, EBOLine;
-    glGenVertexArrays(1, &VBOLine);
-    glGenBuffers(1, &VBOLine);
-    glGenBuffers(1, &EBOLine);
-    // Bind the Vertex Array Object first, then bind and set vertex buffer(s) and attribute pointer(s).
-    glBindVertexArray(VAOLine);
-    glBindBuffer(GL_ARRAY_BUFFER, VBOLine);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat)*4, vertices, GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBOLine);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLfloat)*2, indices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0); // Note that this is allowed, the call to glVertexAttribPointer registered VBO as the currently bound vertex buffer object so afterwards we can safely unbind
-    glBindVertexArray(0); // Unbind VAO (it's always a good thing to unbind any buffer/array to prevent strange bugs), remember: do NOT unbind the EBO, keep it bound to this VAO*/
+	GLfloat deltaTime;
+	GLfloat currentFrame;
+	GLfloat lastFrame;
+
+	setupIndicatorLineBuffers();
 	
     while(!glfwWindowShouldClose(window))
     {
@@ -257,7 +242,11 @@ int main()
         // we "clear" the frame and z buffer
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		
-		dynamicsWorld->stepSimulation(1.f / 60.f, 10);
+		currentFrame = glfwGetTime();
+		deltaTime = currentFrame - lastFrame;
+		lastFrame = currentFrame;
+		
+		dynamicsWorld->stepSimulation((deltaTime < maxSecPerFrame ? deltaTime : maxSecPerFrame),10);
 		
         // we set the rendering mode
         if (wireframe)
@@ -322,14 +311,23 @@ int main()
         // we render the plane
         planeModel.Draw(planeShader);
 		
-        currentTime = glfwGetTime();
-        deltaTime = currentTime - lastTime;
+		btCollisionObject* collisionObject = dynamicsWorld->getCollisionObjectArray()[0];
+		rigidBody = btRigidBody::upcast(collisionObject);
+		btTransform transform;
+		if (rigidBody && rigidBody->getMotionState())
+		{
+			rigidBody->getMotionState()->getWorldTransform(transform);
+		}
+		else
+		{
+			transform = collisionObject->getWorldTransform();
+		}
 		
-		if(deltaTime>DELAY)
+		transform.getOpenGLMatrix(glmTransform);
+	
+		if(transform.getOrigin().getY()<Y_KILL)
 		{
 			removeRigidBody(0);
-			lastTime=glfwGetTime();
-			currentTime=lastTime;
 			GLfloat red=(GLfloat)((GLfloat)(rand()%COLOR_LIMIT)/(GLfloat)COLOR_LIMIT);
 			GLfloat green=(GLfloat)((GLfloat)(rand()%COLOR_LIMIT)/(GLfloat)COLOR_LIMIT);
 			GLfloat blue=(GLfloat)((GLfloat)(rand()%COLOR_LIMIT)/(GLfloat)COLOR_LIMIT);
@@ -357,39 +355,7 @@ int main()
         glUniform3fv(pointLightLocation, 1, glm::value_ptr(lightPositions[0]));
         glUniform3fv(objectDiffuseLocation, 1, diffuseColor);
         glUniform1f(kdObjectLocation, Kd);
-
-		btCollisionObject* collisionObject = dynamicsWorld->getCollisionObjectArray()[0];
-		rigidBody = btRigidBody::upcast(collisionObject);
-		
-		btTransform transform;
-		if (rigidBody && rigidBody->getMotionState())
-		{
-			rigidBody->getMotionState()->getWorldTransform(transform);
-		}
-		else
-		{
-			transform = collisionObject->getWorldTransform();
-		}
-		
-		transform.getOpenGLMatrix(glmTransform);
-		
-        // we create the transformation matrix by defining the Euler's matrices, and the matrix for normals transformation
-        glm::mat4 objectModelMatrix=glm::mat4(glmTransform[0],
-												glmTransform[1],
-												glmTransform[2],
-												glmTransform[3],
-												glmTransform[4],
-												glmTransform[5],
-												glmTransform[6],
-												glmTransform[7],
-												glmTransform[8],
-												glmTransform[9],
-												glmTransform[10],
-												glmTransform[11],
-												glmTransform[12],
-												glmTransform[13],
-												glmTransform[14],
-												glmTransform[15]);
+        glm::mat4 objectModelMatrix=glm::make_mat4(glmTransform);
         glm::mat3 objectNormalMatrix;
         objectNormalMatrix = glm::inverseTranspose(glm::mat3(view*objectModelMatrix));
         glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(objectModelMatrix));
@@ -398,71 +364,60 @@ int main()
 		models.at(modelIndex).Draw(objectShader);
 		
 		if(cut)
+		{
 			drawCutPlane();
+		}
 		
 		if(pressing)
-			drawIndicatorLine();
+		{
+			drawIndicatorLine(lineShader);
+		}
 			
         glfwSwapBuffers(window);
     }
 	
+	glDeleteVertexArrays(1, &VAOSegment);
+    glDeleteBuffers(1, &VBOSegment);
 	planeShader.Delete();
 	objectShader.Delete();
+	lineShader.Delete();
 	glfwDestroyCursor(cursor);
 	deletePhysics();
     glfwTerminate();
     return 0;
 }
 
-void drawIndicatorLine()
+void setupIndicatorLineBuffers()
 {
-	GLuint VBO, VAO, EBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
-    // Bind the Vertex Array Object first, then bind and set vertex buffer(s) and attribute pointer(s).
-    glBindVertexArray(VAO);
+	glGenVertexArrays(1, &VAOSegment);
+	glGenBuffers(1, &VBOSegment);
+	glBindVertexArray(VAOSegment);
+	glBindBuffer(GL_ARRAY_BUFFER, VBOSegment);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(segmentVertices), segmentVertices, GL_DYNAMIC_DRAW);		
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);  
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+}
 
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0); // Note that this is allowed, the call to glVertexAttribPointer registered VBO as the currently bound vertex buffer object so afterwards we can safely unbind
-
-    glBindVertexArray(0); // Unbind VAO (it's always a good thing to unbind any buffer/array to prevent strange bugs), remember: do NOT unbind the EBO, keep it bound to this VAO
+void drawIndicatorLine(Shader lineShader)
+{
+	lineShader.Use();
+	double xpos, ypos;
+	glfwGetCursorPos(window, &xpos, &ypos);
+	float x=(float)xpos;
+	float y=(float)ypos;
+	segmentVertices[3]=2.0f*x*(1.f/screenWidth) - 1.0f;
+	segmentVertices[4]=(-1)*2.0f*y*(1.f/screenHeight) + 1.0f;
+	glBindVertexArray(VAOSegment);
+	glBindBuffer(GL_ARRAY_BUFFER, VBOSegment);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(segmentVertices), segmentVertices);	
+	glDrawArrays(GL_LINES, 0, 2);
 }
 
 void drawCutPlane()
 {
 	cut=false;
-}
-
-void setupCursor(GLFWwindow* window, const char* path)
-{
-	int w, h, channels;
-    unsigned char* imageData;
-    imageData = stbi_load(path, &w, &h, &channels, STBI_rgb_alpha);
-	
-    if (imageData == nullptr)
-	{
-        std::cout << "Failed to load cursor!" << std::endl;
-		return;
-	}
-	
-	GLFWimage image;
-	image.width = w;
-	image.height = h;
-	image.pixels = imageData;
-	GLFWcursor* cursor = glfwCreateCursor(&image, 0, 0);
-	
-	glfwSetCursor(window, cursor);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-    stbi_image_free(imageData);
 }
 
 void setupPhysics()
@@ -483,7 +438,6 @@ void addRigidBody(int i)
 	btVector3 localInertia(0, 0, 0);
 	btCollisionShape* meshCollisionShape = collisionShapes[i];
 	meshCollisionShape->calculateLocalInertia(mass, localInertia);
-	
 	btScalar xModel = ((rand()%101)/101.f)*X_BOUNDARY * ((rand()%2)>0) ? 1 : -1;
 	btScalar yModel = -6;
 	startTransform.setOrigin(btVector3(xModel, yModel, 0));
@@ -561,11 +515,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         keys[key] = false;
 }
 
-void mouse_movement_callback(GLFWwindow* window, double xpos, double ypos)
-{
-
-}
-
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
@@ -574,18 +523,14 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 		glfwGetCursorPos(window, &xpos, &ypos);
 		float x=(float)xpos;
 		float y=(float)ypos;
-		endCut=glm::vec2(x,y);
+		segmentVertices[0]=2.0f*x*(1.f/screenWidth) - 1.0f;
+		segmentVertices[1]=(-1)*2.0f*y*(1.f/screenHeight) + 1.0f;
         printf("Button pressed at %f,%f\n",x,y);
 		pressing=true;
 	}
 	else if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE )
 	{
-		double xpos, ypos;
-		glfwGetCursorPos(window, &xpos, &ypos);
-		float x=(float)xpos;
-		float y=(float)ypos;
-		endCut=glm::vec2(x,y);
-		printf("Button released at %f,%f\n",x,y);
+		printf("Button released\n");
 		pressing=false;
 		cut=true;
 	}
