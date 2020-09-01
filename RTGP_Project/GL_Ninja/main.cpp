@@ -76,6 +76,9 @@ positive Z axis points "outside" the screen
 #include <stb_image/stb_image.h>
 
 #include<btBulletDynamicsCommon.h>
+#include<btBoxShape.h>
+#include<btCylinderShape.h>
+#include<btSphereShape.h>
 
 // number of lights in the scene
 #define NR_LIGHTS 3
@@ -89,7 +92,6 @@ positive Z axis points "outside" the screen
 GLuint screenWidth = 1280, screenHeight = 720;
 
 void drawIndicatorLine(Shader lineShader);
-void drawCutPlane();
 void setupIndicatorLineBuffers();
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
@@ -134,7 +136,7 @@ GLfloat repeat = 1.0;
 GLFWcursor* cursor;
 
 unsigned int VAOSegment, VBOSegment;
-GLfloat segmentVertices[] = {0.f, 0.f, 0.f, 1.f, 1.f, 0.f};
+glm::vec3 segmentVertices[] = {glm::vec3(0.f, 0.f, 1.f), glm::vec3(0.f, 0.f, 1.f)};
 GLuint segmentIndices[] = { 0, 1 };
 
 GLFWwindow* window;
@@ -177,8 +179,7 @@ int main()
 
     // we define the viewport dimensions
     int width, height;
-    glfwGetFramebufferSize(window, &width, &height);
-    glViewport(0, 0, width, height);
+    glViewport(0, 0, screenWidth, screenHeight);
 
     // we enable Z test
     glEnable(GL_DEPTH_TEST);
@@ -190,36 +191,23 @@ int main()
 	Shader objectShader("lambert.vert", "lambert.frag");
 	Shader lineShader("lineShader.vert", "lineShader.frag");
 
-	array<Model, N_MODELS> models={Model("../../models/cube.obj"),
+	array<Model, N_MODELS> models=
+			{Model("../../models/cube.obj"),
 			Model("../../models/cone.obj"),
 			Model("../../models/torus.obj"),
 			Model("../../models/icosphere.obj"),
 			Model("../../models/sphere.obj")};
 	
     Model planeModel("../../models/plane.obj");
+	Model cubeModel("../../models./cube.obj");		
 
     // we load the images and store them in a vector
     textureID.push_back(loadTexture("../../textures/SoilCracked.png"));
 	
 	setupPhysics();
-	
-	for(unsigned int i=0;i<models.size();i++)
-	{
-		for(unsigned int j=0;j<models[i].meshes.size();j++)
-		{
-			btConvexHullShape* meshCollisionShape = new btConvexHullShape();
-			for(unsigned int k=0;k<models[i].meshes[j].vertices.size();k++)
-			{
-				Vertex vertex = models[i].meshes[j].vertices[k];
-				meshCollisionShape->addPoint(btVector3(vertex.Position.x, vertex.Position.y, vertex.Position.z));
-			}
-			
-			collisionShapes.push_back(meshCollisionShape);
-		}
-	}
 
     // Projection matrix: FOV angle, aspect ratio, near and far planes
-    glm::mat4 projection = glm::perspective(45.0f, (float)screenWidth/(float)screenHeight, 0.1f, 10000.0f);
+    glm::mat4 projection = glm::perspective(45.0f, (float)screenWidth/(float)screenHeight, 0.1f, 15.0f);
 	glm::mat4 view = glm::lookAt(glm::vec3(0.f, 0.f, 7.f), glm::vec3(0.f, 0.f, 6.f), glm::vec3(0.f, 1.f, 0.f));
     
 	int modelIndex=0;
@@ -362,17 +350,65 @@ int main()
         glUniformMatrix3fv(glGetUniformLocation(objectShader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(objectNormalMatrix));
 		
 		models.at(modelIndex).Draw(objectShader);
-		
-		if(cut)
-		{
-			drawCutPlane();
-		}
-		
+	
 		if(pressing)
 		{
-			drawIndicatorLine(lineShader);
-		}
+			lineShader.Use();
+			double xCursor, yCursor;
+			glfwGetCursorPos(window, &xCursor, &yCursor);
+			float x=(float)xCursor;
+			float y=(float)yCursor;
+			segmentVertices[1]=glm::vec3(2.0f*(x/screenWidth) - 1.0f, -2.0f*(y/screenHeight) + 1.0f, 1.0);
+			glBindVertexArray(VAOSegment);
+			glBindBuffer(GL_ARRAY_BUFFER, VBOSegment);
+			glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(segmentVertices), segmentVertices);	
+			glDrawArrays(GL_LINES, 0, 2);
+			glm::vec4 cutPlaneEndPoint=glm::vec4(segmentVertices[1].x,-segmentVertices[1].y,0,1.0);
+			cutPlaneEndPoint= inverse(projection*view)*cutPlaneEndPoint;
+			cutPlaneEndPoint.x*=cutPlaneEndPoint.w;
+			cutPlaneEndPoint.y*=cutPlaneEndPoint.w;
+			cutPlaneEndPoint.z*=cutPlaneEndPoint.w;
+			objectShader.Use();
+			/*glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
+			glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
 			
+			glm::mat4 cubeModelMatrix;
+			glm::mat3 cubeNormalMatrix;
+			cubeModelMatrix = glm::translate(glm::mat4(1.0), glm::vec3(cutPlaneEndPoint.x, -cutPlaneEndPoint.y, 0));
+			cubeNormalMatrix = glm::inverseTranspose(glm::mat3(view*cubeModelMatrix));
+			
+			glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(cubeModelMatrix));
+			glUniformMatrix3fv(glGetUniformLocation(objectShader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(cubeNormalMatrix));
+			cubeModel.Draw(objectShader);*/
+		}
+		else if(cut)
+		{
+			//Converting ndc coordinates to world coordinates
+			cut=false;
+			glm::vec4 cutPlaneStartPoint=glm::vec4(segmentVertices[0].x,-segmentVertices[0].y,-segmentVertices[0].z,1.);
+			glm::vec4 cutPlaneEndPoint=glm::vec4(segmentVertices[1].x,-segmentVertices[1].y,-segmentVertices[1].z,1.);
+			cutPlaneStartPoint = inverse(projection*view)*cutPlaneStartPoint;
+			cutPlaneEndPoint= inverse(projection*view)*cutPlaneEndPoint;
+			cutPlaneStartPoint.x*=cutPlaneStartPoint.w;
+			cutPlaneStartPoint.y*=cutPlaneStartPoint.w*(-1);
+			cutPlaneStartPoint.z*=0;
+			cutPlaneEndPoint.x*=cutPlaneEndPoint.w;
+			cutPlaneEndPoint.y*=cutPlaneEndPoint.w*(-1);
+			cutPlaneEndPoint.z*=0;
+			printf("Starting cut position:%f,%f,%f\n",cutPlaneStartPoint.x,cutPlaneStartPoint.y,cutPlaneStartPoint.z);
+			printf("End cut position:%f,%f,%f\n",cutPlaneEndPoint.x,cutPlaneEndPoint.y,cutPlaneEndPoint.z);
+			btCollisionWorld::ClosestRayResultCallback RayCallback(btVector3(cutPlaneStartPoint.x, cutPlaneStartPoint.y, cutPlaneStartPoint.z),
+									btVector3(cutPlaneEndPoint.x, cutPlaneEndPoint.y, cutPlaneEndPoint.z));
+				
+			dynamicsWorld->rayTest(btVector3(cutPlaneStartPoint.x, cutPlaneStartPoint.y, cutPlaneStartPoint.z),
+									btVector3(cutPlaneEndPoint.x, cutPlaneEndPoint.y, cutPlaneEndPoint.z),
+									RayCallback);
+									
+			if(RayCallback.hasHit()) 
+			{
+				printf("You have cut something!\n");
+			}
+		}
         glfwSwapBuffers(window);
     }
 	
@@ -400,26 +436,6 @@ void setupIndicatorLineBuffers()
 	glBindVertexArray(0);
 }
 
-void drawIndicatorLine(Shader lineShader)
-{
-	lineShader.Use();
-	double xpos, ypos;
-	glfwGetCursorPos(window, &xpos, &ypos);
-	float x=(float)xpos;
-	float y=(float)ypos;
-	segmentVertices[3]=2.0f*x*(1.f/screenWidth) - 1.0f;
-	segmentVertices[4]=(-1)*2.0f*y*(1.f/screenHeight) + 1.0f;
-	glBindVertexArray(VAOSegment);
-	glBindBuffer(GL_ARRAY_BUFFER, VBOSegment);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(segmentVertices), segmentVertices);	
-	glDrawArrays(GL_LINES, 0, 2);
-}
-
-void drawCutPlane()
-{
-	cut=false;
-}
-
 void setupPhysics()
 {
 	collisionConfiguration = new btDefaultCollisionConfiguration();
@@ -428,6 +444,17 @@ void setupPhysics()
 	solver = new btSequentialImpulseConstraintSolver;
 	dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration);
 	dynamicsWorld->setGravity(btVector3(0, gravity, 0));	
+	
+	btCollisionShape* cube=new btBoxShape(btVector3(1.0f, 1.0f, 1.0f));
+	collisionShapes.push_back(cube);
+	btCollisionShape* cone=new btConeShape(1.0f, 2.0f);
+	collisionShapes.push_back(cone);
+	btCollisionShape* torus=new btCylinderShape(btVector3(0.25f, 6.25f, 0.0f));
+	collisionShapes.push_back(torus);
+	btCollisionShape* iconsphere = new btSphereShape(1.0f);
+	collisionShapes.push_back(iconsphere);
+	btCollisionShape* sphere=new btSphereShape(1.0f);
+	collisionShapes.push_back(sphere);
 }
 
 void addRigidBody(int i)
@@ -523,14 +550,11 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 		glfwGetCursorPos(window, &xpos, &ypos);
 		float x=(float)xpos;
 		float y=(float)ypos;
-		segmentVertices[0]=2.0f*x*(1.f/screenWidth) - 1.0f;
-		segmentVertices[1]=(-1)*2.0f*y*(1.f/screenHeight) + 1.0f;
-        printf("Button pressed at %f,%f\n",x,y);
+		segmentVertices[0]=glm::vec3(2.0f*(x/screenWidth) - 1.0f, (-1)*2.0f*(y/screenHeight) + 1.0f, 0);
 		pressing=true;
 	}
 	else if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE )
 	{
-		printf("Button released\n");
 		pressing=false;
 		cut=true;
 	}

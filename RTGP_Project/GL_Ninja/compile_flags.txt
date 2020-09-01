@@ -1,5 +1,6 @@
 -ID:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\GL_Ninja
 -ID:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include
 -ID:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include\bullet
+-ID:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include\bullet\BulletCollision\CollisionShapes
 -target
 x86_64-pc-windows-gnu

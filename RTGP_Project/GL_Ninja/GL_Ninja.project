@@ -26,6 +26,7 @@
         <IncludePath Value="."/>
         <IncludePath Value="../include"/>
         <IncludePath Value="../include/bullet"/>
+        <IncludePath Value="../include/bullet/BulletCollision/CollisionShapes"/>
       </Compiler>
       <Linker Options="-static-libgcc -static-libstdc++" Required="yes">
         <LibraryPath Value="../libs/win"/>
