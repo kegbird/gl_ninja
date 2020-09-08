@@ -32,6 +32,7 @@ positive Z axis points "outside" the screen
     #define __USE_MINGW_ANSI_STDIO 0
 #endif
 // Std. Includes
+#include <list>
 #include <time.h>
 #include <string>
 #include <cstdlib>
@@ -55,6 +56,7 @@ positive Z axis points "outside" the screen
 // in this example, the Model and Mesh classes support texturing
 #include <utils/shader.h>
 #include <utils/model.h>
+#include <utils/physics.h>
 
 // we load the GLM classes used in the application
 #include <glm/glm.hpp>
@@ -67,18 +69,11 @@ positive Z axis points "outside" the screen
 #include <stb_image/stb_image.h>
 
 #include<btBulletDynamicsCommon.h>
-#include<btBoxShape.h>
-#include<btCylinderShape.h>
-#include<btSphereShape.h>
 
 // number of lights in the scene
 #define NR_LIGHTS 3
 #define N_MODELS 5
 #define COLOR_LIMIT 256
-#define X_BOUNDARY 6
-#define Y_KILL -6
-#define X_IMPULSE_BOUNDARY 2
-#define Y_IMPULSE_BOUNDARY 13
 
 GLuint screenWidth = 1280, screenHeight = 720;
 
@@ -87,11 +82,6 @@ void setupIndicatorLineBuffers();
 void calculateCutNDCCoordinates(int i);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
-void setupPhysics();
-void addRigidBody(int i);
-void removeRigidBody(int i);
-void deletePhysics();
-void deleteMeshes();
 GLint loadTexture(const char* path);
 
 bool keys[1024];
@@ -132,13 +122,6 @@ unsigned int VAOCut, VBOCut;
 glm::vec3 cutVerticesNDC[] = {glm::vec3(0.f, 0.f, 1.f), glm::vec3(0.f, 0.f, 1.f)};
 
 GLFWwindow* window;
-float gravity=-9.82f;
-btDefaultCollisionConfiguration* collisionConfiguration;
-btCollisionDispatcher* dispatcher;
-btBroadphaseInterface* overlappingPairCache;
-btSequentialImpulseConstraintSolver* solver;
-btDiscreteDynamicsWorld* dynamicsWorld; 
-btAlignedObjectArray<btCollisionShape*> collisionShapes;
 
 int main()
 {
@@ -178,34 +161,25 @@ int main()
 	Shader planeShader("18_phong_tex_multiplelights.vert", "19a_blinnphong_tex_multiplelights.frag");
 	Shader objectShader("lambert.vert", "lambert.frag");
 	Shader lineShader("lineShader.vert", "lineShader.frag");
-
-	array<Model, N_MODELS> models=
-			{Model("../../models/cube.obj"),
-			Model("../../models/cone.obj"),
-			Model("../../models/torus.obj"),
-			Model("../../models/icosphere.obj"),
-			Model("../../models/sphere.obj")};
 	
+	array<string, N_MODELS> modelPaths={"../../models/cube.obj","../../models/cone.obj","../../models/cylinder.obj","../../models/icosphere.obj","../../models/sphere.obj"};
+			
     Model planeModel("../../models/plane.obj");
-
-    // we load the images and store them in a vector
     textureID.push_back(loadTexture("../../textures/SoilCracked.png"));
 	
-	setupPhysics();
-
 	int modelIndex=0;
-	
-	btRigidBody* rigidBody;
-	float glmTransform[16];
-	
-	addRigidBody(modelIndex);
-	
+	Physics engine=Physics();
+	engine.addRigidBodyWithImpulse(modelIndex);
+	vector<Mesh> meshToDraw;
+	Model* object = new Model(modelPaths[modelIndex]);
+	meshToDraw.insert(meshToDraw.end(), object->meshes.begin(), object->meshes.end());
+
 	GLfloat deltaTime;
 	GLfloat currentFrame;
 	GLfloat lastFrame;
-
-	setupIndicatorLineBuffers();
+	int i=0;
 	
+	setupIndicatorLineBuffers();
     while(!glfwWindowShouldClose(window))
     {
         // Check is an I/O event is happening
@@ -216,8 +190,6 @@ int main()
 		currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
-		
-		dynamicsWorld->stepSimulation((deltaTime < maxSecPerFrame ? deltaTime : maxSecPerFrame),10);
 		
         // we set the rendering mode
         if (wireframe)
@@ -282,56 +254,51 @@ int main()
         // we render the plane
         planeModel.Draw(planeShader);
 		
-		btCollisionObject* collisionObject = dynamicsWorld->getCollisionObjectArray()[0];
-		rigidBody = btRigidBody::upcast(collisionObject);
-		btTransform transform;
-		if (rigidBody && rigidBody->getMotionState())
-		{
-			rigidBody->getMotionState()->getWorldTransform(transform);
-		}
-		else
-		{
-			transform = collisionObject->getWorldTransform();
-		}
+		engine.dynamicsWorld->stepSimulation((deltaTime < maxSecPerFrame ? deltaTime : maxSecPerFrame),10);
+		engine.removeObjectUnderThreshold();
 		
-		transform.getOpenGLMatrix(glmTransform);
-	
-		if(transform.getOrigin().getY()<Y_KILL)
+		if(engine.allObjectRemoved())
 		{
-			removeRigidBody(0);
+			delete object;
+			meshToDraw.clear();
 			GLfloat red=(GLfloat)((GLfloat)(rand()%COLOR_LIMIT)/(GLfloat)COLOR_LIMIT);
 			GLfloat green=(GLfloat)((GLfloat)(rand()%COLOR_LIMIT)/(GLfloat)COLOR_LIMIT);
 			GLfloat blue=(GLfloat)((GLfloat)(rand()%COLOR_LIMIT)/(GLfloat)COLOR_LIMIT);
-			
 			diffuseColor[0]=red;
 			diffuseColor[1]=green;
 			diffuseColor[2]=blue;
-			
 			modelIndex++;
 			modelIndex = modelIndex%N_MODELS;
-			addRigidBody(modelIndex);
+			object=new Model(modelPaths[modelIndex]);
+			engine.addRigidBodyWithImpulse(modelIndex);
+			meshToDraw.insert(meshToDraw.end(),object->meshes.begin(), object->meshes.end());
 		}
 		
-		objectShader.Use();
-        // we pass projection and view matrices to the Shader Program of the plane
-        glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
-        glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
+		std::vector<Mesh>::iterator meshToDrawIt;
 
-        // we determine the position in the Shader Program of the uniform variables
-        GLint pointLightLocation = glGetUniformLocation(objectShader.Program, "pointLightPosition");
-        GLint objectDiffuseLocation = glGetUniformLocation(objectShader.Program, "diffuseColor");
-        GLint kdObjectLocation = glGetUniformLocation(objectShader.Program, "Kd");
-
-        // we assign the value to the uniform variables
-        glUniform3fv(pointLightLocation, 1, glm::value_ptr(lightPositions[0]));
-        glUniform3fv(objectDiffuseLocation, 1, diffuseColor);
-        glUniform1f(kdObjectLocation, Kd);
-        glm::mat4 objectModelMatrix=glm::make_mat4(glmTransform);
-        glm::mat3 objectNormalMatrix;
-        objectNormalMatrix = glm::inverseTranspose(glm::mat3(view*objectModelMatrix));
-        glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(objectModelMatrix));
-        glUniformMatrix3fv(glGetUniformLocation(objectShader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(objectNormalMatrix));
-		models.at(modelIndex).Draw(objectShader);
+		for (meshToDrawIt = meshToDraw.begin(); meshToDrawIt != meshToDraw.end(); ++meshToDrawIt)
+		{
+			objectShader.Use();
+			// we pass projection and view matrices to the Shader Program of the plane
+			glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
+			glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
+			// we determine the position in the Shader Program of the uniform variables
+			GLint pointLightLocation = glGetUniformLocation(objectShader.Program, "pointLightPosition");
+			GLint objectDiffuseLocation = glGetUniformLocation(objectShader.Program, "diffuseColor");
+			GLint kdObjectLocation = glGetUniformLocation(objectShader.Program, "Kd");
+			// we assign the value to the uniform variables
+			glUniform3fv(pointLightLocation, 1, glm::value_ptr(lightPositions[0]));
+			glUniform3fv(objectDiffuseLocation, 1, diffuseColor);
+			glUniform1f(kdObjectLocation, Kd);
+			glm::mat4 objectModelMatrix=engine.getObjectModelMatrix(i);
+			glm::mat3 objectNormalMatrix;
+			objectNormalMatrix = glm::inverseTranspose(glm::mat3(view*objectModelMatrix));
+			glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(objectModelMatrix));
+			glUniformMatrix3fv(glGetUniformLocation(objectShader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(objectNormalMatrix));
+			meshToDrawIt->Draw(objectShader);
+			i++;
+		}
+		i=0;
 	
 		if(pressing)
 		{
@@ -351,31 +318,35 @@ int main()
 			cutStartPointWS = inverse(projection*view)*cutStartPointWS;
 			cutStartPointWS.x*=cutStartPointWS.w;
 			cutStartPointWS.y*=cutStartPointWS.w*(-1);
-			cutStartPointWS.z*=0;
+			cutStartPointWS.z=0;
 			cutEndPointWS= inverse(projection*view)*cutEndPointWS;
 			cutEndPointWS.x*=cutEndPointWS.w;
 			cutEndPointWS.y*=cutEndPointWS.w*(-1);
-			cutEndPointWS.z*=0;
+			cutEndPointWS.z=0;
 			
 			btCollisionWorld::ClosestRayResultCallback RayCallback(btVector3(cutStartPointWS.x, cutStartPointWS.y, cutStartPointWS.z),
 									btVector3(cutEndPointWS.x, cutEndPointWS.y, cutEndPointWS.z));
 				
-			dynamicsWorld->rayTest(btVector3(cutStartPointWS.x, cutStartPointWS.y, cutStartPointWS.z),
+			engine.dynamicsWorld->rayTest(btVector3(cutStartPointWS.x, cutStartPointWS.y, cutStartPointWS.z),
 									btVector3(cutEndPointWS.x, cutEndPointWS.y, cutEndPointWS.z),
 									RayCallback);
 									
-			if(RayCallback.hasHit()) 
+			if(RayCallback.hasHit())
+			{
 				printf("You have cut something!\n");
+			}
 		}
         glfwSwapBuffers(window);
     }
 	
+	delete object;
+	meshToDraw.clear();
 	glDeleteVertexArrays(1, &VAOCut);
     glDeleteBuffers(1, &VBOCut);
+	engine.Clear();
 	planeShader.Delete();
 	objectShader.Delete();
 	lineShader.Delete();
-	deletePhysics();
     glfwTerminate();
     return 0;
 }
@@ -392,65 +363,6 @@ void setupIndicatorLineBuffers()
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 }
-
-void setupPhysics()
-{
-	collisionConfiguration = new btDefaultCollisionConfiguration();
-	dispatcher = new btCollisionDispatcher(collisionConfiguration);
-	overlappingPairCache = new btDbvtBroadphase();
-	solver = new btSequentialImpulseConstraintSolver;
-	dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration);
-	dynamicsWorld->setGravity(btVector3(0, gravity, 0));	
-	btCollisionShape* cube=new btBoxShape(btVector3(1.0f, 1.0f, 1.0f));
-	collisionShapes.push_back(cube);
-	btCollisionShape* cone=new btConeShape(1.0f, 2.0f);
-	collisionShapes.push_back(cone);
-	btCollisionShape* torus=new btCylinderShape(btVector3(0.25f, 6.25f, 0.0f));
-	collisionShapes.push_back(torus);
-	btCollisionShape* iconsphere = new btSphereShape(1.0f);
-	collisionShapes.push_back(iconsphere);
-	btCollisionShape* sphere=new btSphereShape(1.0f);
-	collisionShapes.push_back(sphere);
-}
-
-void addRigidBody(int i)
-{
-	btTransform startTransform;
-	startTransform.setIdentity();
-	btScalar mass(1.f);
-	btVector3 localInertia(0, 0, 0);
-	btCollisionShape* meshCollisionShape = collisionShapes[i];
-	meshCollisionShape->calculateLocalInertia(mass, localInertia);
-	btScalar xModel = ((rand()%101)/101.f)*X_BOUNDARY * ((rand()%2)>0) ? 1 : -1;
-	btScalar yModel = -6;
-	startTransform.setOrigin(btVector3(xModel, yModel, 0));
-	btDefaultMotionState* motionState = new btDefaultMotionState(startTransform);
-	btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, meshCollisionShape, localInertia);
-	btRigidBody* body = new btRigidBody(rbInfo);
-	dynamicsWorld->addRigidBody(body);
-	
-	btScalar xImpulse = ((rand()%101)/101.f)*X_IMPULSE_BOUNDARY * ((rand()%2)>0) ? 1 : -1;
-	btScalar yImpulse = Y_IMPULSE_BOUNDARY;
-	body->applyImpulse(btVector3(xImpulse,yImpulse,0), btVector3(1,0,0));
-}
-
-void removeRigidBody(int i)
-{
-	btCollisionObject* collisionObject = dynamicsWorld->getCollisionObjectArray()[i];
-	btRigidBody* rigidBody = btRigidBody::upcast(collisionObject);
-	dynamicsWorld->removeRigidBody(rigidBody);
-}
-
-void deletePhysics()
-{
-	delete dynamicsWorld;
-	delete solver;
-	delete overlappingPairCache;
-	delete dispatcher;
-	delete collisionConfiguration;
-	collisionShapes.clear();
-}
-
 
 GLint loadTexture(const char* path)
 {

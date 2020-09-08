@@ -1,18 +1,13 @@
 /*
 Mesh class - v2
 - allocation and initialization of VBO, VAO, and EBO buffers, and sets as OpenGL must consider the data in the buffers
-
 VBO : Vertex Buffer Object - memory allocated on GPU memory to store the mesh data (vertices and their attributes, like e.g. normals, etc)
 EBO : Element Buffer Object - a buffer maintaining the indices of vertices composing the mesh faces
 VAO : Vertex Array Object - a buffer that helps to "manage" VBO and its inner structure. It stores pointers to the different vertex attributes stored in the VBO. When we need to render an object, we can just bind the corresponding VAO, and all the needed calls to set up the binding between vertex attributes and memory positions in the VBO are automatically configured.
 See https://learnopengl.com/#!Getting-started/Hello-Triangle for details.
-
 N.B. 1) in this version of the class, textures are loaded and applied
-
 N.B. 2) adaptation of https://github.com/JoeyDeVries/LearnOpenGL/blob/master/includes/learnopengl/mesh.h
-
 author: Davide Gadia
-
 Real-Time Graphics Programming - a.a. 2018/2019
 Master degree in Computer Science
 Universita' degli Studi di Milano

@@ -2,13 +2,9 @@
 Model class - v2
 - OBJ models loading using Assimp library
 - Convert data from Assimp data structure to a OpenGL-compatible data structure (Mesh class in mesh_v1.h)
-
 N.B. 1) in this version of the class, eventual textures defined in the model (exported by modeling SWs) are loaded and applied
-
 N.B. 2) adaptation of https://github.com/JoeyDeVries/LearnOpenGL/blob/master/includes/learnopengl/model.h
-
 author: Davide Gadia
-
 Real-Time Graphics Programming - a.a. 2018/2019
 Master degree in Computer Science
 Universita' degli Studi di Milano
@@ -59,6 +55,7 @@ public:
     string directory;
 
     //////////////////////////////////////////
+	Model(){}
 
     // constructor
     Model(const string& path)
