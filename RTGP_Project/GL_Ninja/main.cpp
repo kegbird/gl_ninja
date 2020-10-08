@@ -57,6 +57,7 @@ positive Z axis points "outside" the screen
 #include <utils/shader.h>
 #include <utils/model.h>
 #include <utils/physics.h>
+#include <utils/scene.h>
 
 // we load the GLM classes used in the application
 #include <glm/glm.hpp>
@@ -73,12 +74,10 @@ positive Z axis points "outside" the screen
 // number of lights in the scene
 #define NR_LIGHTS 3
 #define N_MODELS 5
-#define COLOR_LIMIT 256
 
 GLuint screenWidth = 1280, screenHeight = 720;
 
 void drawIndicatorLine(Shader lineShader);
-void setupIndicatorLineBuffers();
 void calculateCutNDCCoordinates(int i);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
@@ -114,10 +113,6 @@ GLfloat F0 = 0.9f;
 vector<GLint> textureID;
 GLfloat repeat = 1.0;
 
-// Projection matrix: FOV angle, aspect ratio, near and far planes
-glm::mat4 projection = glm::perspective(45.0f, (float)screenWidth/(float)screenHeight, 0.1f, 15.0f);
-glm::mat4 view = glm::lookAt(glm::vec3(0.f, 0.f, 7.f), glm::vec3(0.f, 0.f, 6.f), glm::vec3(0.f, 1.f, 0.f));
-
 unsigned int VAOCut, VBOCut;
 glm::vec3 cutVerticesNDC[] = {glm::vec3(0.f, 0.f, 1.f), glm::vec3(0.f, 0.f, 1.f)};
 
@@ -141,7 +136,6 @@ int main()
 		return -1;
 	}
 	glfwMakeContextCurrent(window);
-	
     glfwSetKeyCallback(window, key_callback);
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
 
@@ -162,34 +156,38 @@ int main()
 	Shader objectShader("lambert.vert", "lambert.frag");
 	Shader lineShader("lineShader.vert", "lineShader.frag");
 	
+		
+	// Projection matrix: FOV angle, aspect ratio, near and far planes
+	glm::mat4 projection = glm::perspective(45.0f, (float)screenWidth/(float)screenHeight, 0.1f, 15.0f);
+	glm::mat4 view = glm::lookAt(glm::vec3(0.f, 0.f, 7.f), glm::vec3(0.f, 0.f, 6.f), glm::vec3(0.f, 1.f, 0.f));
+	
 	array<string, N_MODELS> modelPaths={"../../models/cube.obj","../../models/cone.obj","../../models/cylinder.obj","../../models/icosphere.obj","../../models/sphere.obj"};
-			
+	int modelIndex=0;
+	
+	Scene scene=Scene(projection, view);
     Model planeModel("../../models/plane.obj");
     textureID.push_back(loadTexture("../../textures/SoilCracked.png"));
 	
-	int modelIndex=0;
-	Physics engine=Physics();
-	engine.addRigidBodyWithImpulse(modelIndex);
-	vector<Mesh> meshToDraw;
-	Model* object = new Model(modelPaths[modelIndex]);
-	meshToDraw.insert(meshToDraw.end(), object->meshes.begin(), object->meshes.end());
-
 	GLfloat deltaTime;
 	GLfloat currentFrame;
 	GLfloat lastFrame;
-	int i=0;
 	
-	setupIndicatorLineBuffers();
+	glGenVertexArrays(1, &VAOCut);
+	glGenBuffers(1, &VBOCut);
+	glBindVertexArray(VAOCut);
+	glBindBuffer(GL_ARRAY_BUFFER, VBOCut);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(cutVerticesNDC), cutVerticesNDC, GL_DYNAMIC_DRAW);		
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);  
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+	
     while(!glfwWindowShouldClose(window))
     {
         // Check is an I/O event is happening
         glfwPollEvents();
         // we "clear" the frame and z buffer
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		
-		currentFrame = glfwGetTime();
-		deltaTime = currentFrame - lastFrame;
-		lastFrame = currentFrame;
 		
         // we set the rendering mode
         if (wireframe)
@@ -254,52 +252,20 @@ int main()
         // we render the plane
         planeModel.Draw(planeShader);
 		
-		engine.dynamicsWorld->stepSimulation((deltaTime < maxSecPerFrame ? deltaTime : maxSecPerFrame),10);
-		engine.removeObjectUnderThreshold();
+		currentFrame = glfwGetTime();
+		deltaTime = currentFrame - lastFrame;
+		lastFrame = currentFrame;
 		
-		if(engine.allObjectRemoved())
+		scene.SimulationStep();
+		if(scene.AllMeshRemoved())
 		{
-			delete object;
-			meshToDraw.clear();
-			GLfloat red=(GLfloat)((GLfloat)(rand()%COLOR_LIMIT)/(GLfloat)COLOR_LIMIT);
-			GLfloat green=(GLfloat)((GLfloat)(rand()%COLOR_LIMIT)/(GLfloat)COLOR_LIMIT);
-			GLfloat blue=(GLfloat)((GLfloat)(rand()%COLOR_LIMIT)/(GLfloat)COLOR_LIMIT);
-			diffuseColor[0]=red;
-			diffuseColor[1]=green;
-			diffuseColor[2]=blue;
+			scene.AddMesh(modelIndex, modelPaths[modelIndex]);
 			modelIndex++;
 			modelIndex = modelIndex%N_MODELS;
-			object=new Model(modelPaths[modelIndex]);
-			engine.addRigidBodyWithImpulse(modelIndex);
-			meshToDraw.insert(meshToDraw.end(),object->meshes.begin(), object->meshes.end());
 		}
 		
-		std::vector<Mesh>::iterator meshToDrawIt;
-
-		for (meshToDrawIt = meshToDraw.begin(); meshToDrawIt != meshToDraw.end(); ++meshToDrawIt)
-		{
-			objectShader.Use();
-			// we pass projection and view matrices to the Shader Program of the plane
-			glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
-			glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
-			// we determine the position in the Shader Program of the uniform variables
-			GLint pointLightLocation = glGetUniformLocation(objectShader.Program, "pointLightPosition");
-			GLint objectDiffuseLocation = glGetUniformLocation(objectShader.Program, "diffuseColor");
-			GLint kdObjectLocation = glGetUniformLocation(objectShader.Program, "Kd");
-			// we assign the value to the uniform variables
-			glUniform3fv(pointLightLocation, 1, glm::value_ptr(lightPositions[0]));
-			glUniform3fv(objectDiffuseLocation, 1, diffuseColor);
-			glUniform1f(kdObjectLocation, Kd);
-			glm::mat4 objectModelMatrix=engine.getObjectModelMatrix(i);
-			glm::mat3 objectNormalMatrix;
-			objectNormalMatrix = glm::inverseTranspose(glm::mat3(view*objectModelMatrix));
-			glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(objectModelMatrix));
-			glUniformMatrix3fv(glGetUniformLocation(objectShader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(objectNormalMatrix));
-			meshToDrawIt->Draw(objectShader);
-			i++;
-		}
-		i=0;
-	
+		scene.DrawMeshes();
+		
 		if(pressing)
 		{
 			calculateCutNDCCoordinates(1);
@@ -312,7 +278,7 @@ int main()
 		else if(cut)
 		{
 			//Converting ndc coordinates to world coordinates
-			cut=false;
+			/*cut=false;
 			glm::vec4 cutStartPointWS=glm::vec4(cutVerticesNDC[0].x,-cutVerticesNDC[0].y,-cutVerticesNDC[0].z,1.);
 			glm::vec4 cutEndPointWS=glm::vec4(cutVerticesNDC[1].x,-cutVerticesNDC[1].y,-cutVerticesNDC[1].z,1.);
 			cutStartPointWS = inverse(projection*view)*cutStartPointWS;
@@ -334,34 +300,18 @@ int main()
 			if(RayCallback.hasHit())
 			{
 				printf("You have cut something!\n");
-			}
+			}*/
 		}
         glfwSwapBuffers(window);
     }
 	
-	delete object;
-	meshToDraw.clear();
 	glDeleteVertexArrays(1, &VAOCut);
     glDeleteBuffers(1, &VBOCut);
-	engine.Clear();
+	scene.Clear();
 	planeShader.Delete();
-	objectShader.Delete();
 	lineShader.Delete();
     glfwTerminate();
     return 0;
-}
-
-void setupIndicatorLineBuffers()
-{
-	glGenVertexArrays(1, &VAOCut);
-	glGenBuffers(1, &VBOCut);
-	glBindVertexArray(VAOCut);
-	glBindBuffer(GL_ARRAY_BUFFER, VBOCut);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(cutVerticesNDC), cutVerticesNDC, GL_DYNAMIC_DRAW);		
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);  
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindVertexArray(0);
 }
 
 GLint loadTexture(const char* path)

@@ -32,7 +32,11 @@ public:
     GLuint Program;
 
     //////////////////////////////////////////
-
+	Shader()
+	{
+		
+	}
+	
     //constructor
     Shader(const GLchar* vertexPath, const GLchar* fragmentPath)
     {
