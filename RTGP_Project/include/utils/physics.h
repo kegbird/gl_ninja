@@ -9,24 +9,20 @@ createRigidBody method sets up a  Box or Sphere Collision Shape. For other Shape
 author: Davide Gadia
 
 Real-Time Graphics Programming - a.a. 2018/2019
-Master degree in Computer Science
+Master degree in ComputclTabCtrler Science
 Universita' degli Studi di Milano
 */
 
 #pragma once
-#define Y_KILL -6
+//#define GRAVITY -9.82f
+#define GRAVITY 0.0f
 #define X_BOUNDARY 6
 #define X_IMPULSE_BOUNDARY 2
 #define Y_IMPULSE_BOUNDARY 13
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
-
 #include <bullet/btBulletDynamicsCommon.h>
-
-
-//enum to identify the 2 considered Collision Shapes
-enum shapes{ BOX, SPHERE};
 
 ///////////////////  Physics class ///////////////////////
 class Physics
@@ -63,39 +59,10 @@ public:
         this->dynamicsWorld = new btDiscreteDynamicsWorld(this->dispatcher,this->overlappingPairCache,this->solver,this->collisionConfiguration);
 
         // we set the gravity force
-        this->dynamicsWorld->setGravity(btVector3(0.0f,-9.82f,0.0f));
+        this->dynamicsWorld->setGravity(btVector3(0.0f,GRAVITY,0.0f));
     }
 	
-	void removeObjectUnderThreshold()
-	{
-		for(int i=dynamicsWorld->getCollisionObjectArray().size()-1;i>=0;i--)
-		{
-			btCollisionObject* collisionObject = dynamicsWorld->getCollisionObjectArray()[i];
-			btRigidBody* rigidBody = btRigidBody::upcast(collisionObject);
-			btTransform transform;
-			if (rigidBody && rigidBody->getMotionState())
-			{
-				rigidBody->getMotionState()->getWorldTransform(transform);
-			}
-			else
-			{
-				transform = collisionObject->getWorldTransform();
-			}
-			
-			float glmTransform[16];
-			transform.getOpenGLMatrix(glmTransform);
-	
-			if(transform.getOrigin().getY()<=Y_KILL)
-				removeRigidBody(i);
-		}
-	}
-	
-	bool allObjectRemoved()
-	{
-		return dynamicsWorld->getCollisionObjectArray().size()==0;
-	}
-	
-	glm::mat4 getObjectModelMatrix(int i)
+	glm::mat4 GetObjectModelMatrix(int i)
 	{
 		btCollisionObject* collisionObject = dynamicsWorld->getCollisionObjectArray()[0];
 		btRigidBody* rigidBody = btRigidBody::upcast(collisionObject);
@@ -114,26 +81,25 @@ public:
 		return glm::make_mat4(glmTransform);
 	}
 	
-	void addRigidBodyWithImpulse(int i)
+	void AddRigidBodyWithImpulse(int i)
 	{
 		btCollisionShape* shape;
 		switch(i)
 		{
 			case 0:
-				shape=new btBoxShape(btVector3(btScalar(0.85), btScalar(0.85), btScalar(0.85)));
+				shape=new btBoxShape(btVector3(btScalar(1.0f), btScalar(1.0f), btScalar(1.0f)));
 				break;
 			case 1:
-				shape=new btConeShape(btScalar(0.75), btScalar(1.40));
+				shape=new btConeShape(btScalar(1.0f), btScalar(2.0f));
 				break;
 			case 2:
-				shape=new btCylinderShape(btVector3(btScalar(0.7), btScalar(0.8), btScalar(0.0)));
+				shape=new btCylinderShape(btVector3(btScalar(1.0f), btScalar(2.0f), btScalar(0.0)));
 				break;
 			default:
-				shape=new btSphereShape(btScalar(0.7));
+				shape=new btSphereShape(btScalar(1.0f));
 				break;
 		}
 		collisionShapes.push_back(shape);
-
 		btTransform startTransform;
 		startTransform.setIdentity();
 		btScalar mass(1.f);
@@ -141,7 +107,7 @@ public:
 		shape->calculateLocalInertia(mass, localInertia);
 		btScalar xModel = ((rand()%101)/101.f)*X_BOUNDARY * ((rand()%2)>0) ? 1 : -1;
 		btScalar yModel = -5.9;
-		startTransform.setOrigin(btVector3(0, 0, 0));
+		startTransform.setOrigin(btVector3(0, -2, 0));
 		btDefaultMotionState* motionState = new btDefaultMotionState(startTransform);
 		btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, shape, localInertia);
 		rbInfo.m_angularDamping =0.90f;
@@ -153,7 +119,7 @@ public:
 		//body->applyImpulse(btVector3(xImpulse,yImpulse,0), btVector3(1,0,0));
 	}
 	
-	void removeRigidBody(int i)
+	void RemoveRigidBodyAtIndex(int i)
 	{
 		printf("Coll. objects: %d.\n", dynamicsWorld->getCollisionObjectArray().size());
 		btCollisionObject* collisionObject = dynamicsWorld->getCollisionObjectArray()[i];

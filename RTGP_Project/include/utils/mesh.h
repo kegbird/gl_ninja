@@ -58,6 +58,7 @@ public:
     vector<Texture> textures;
     GLuint VAO;
 
+	Mesh(){}
     //////////////////////////////////////////
     // Constructor
 	Mesh(vector<Vertex> vertices, vector<GLuint> indices, vector<Texture> textures)
