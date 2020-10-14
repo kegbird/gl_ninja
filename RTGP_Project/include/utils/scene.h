@@ -112,8 +112,12 @@ public:
 		meshDiffuseColor[1]=green;
 		meshDiffuseColor[2]=blue;
 		Model* object = new Model(meshPath);
-		cuttableMeshes.insert(cuttableMeshes.end(), object->meshes.begin(), object->meshes.end());
+		std::vector<Mesh>::iterator cuttableMeshesIt=cuttableMeshes.begin();
+		cuttableMeshes.insert(cuttableMeshesIt, object->meshes.begin(), object->meshes.end());
 		engine.AddRigidBodyWithImpulse(meshIndex);
+		
+		printf("ciao %d\n", engine.collisionShapes.size());
+		printf("prova %d\n", cuttableMeshes.size());
 	}
 	
 	bool AllMeshRemoved()
@@ -131,17 +135,20 @@ public:
 		cutStartPointWS/=cutStartPointWS.w;
 		cutEndPointWS = projViewInv*cutEndPointWS;
 		cutEndPointWS/=cutEndPointWS.w;
-		printf("debug line from %f, %f, %f to %f, %f, %f\n",cutStartPointWS.x, cutStartPointWS.y, cutStartPointWS.z, cutEndPointWS.x, cutEndPointWS.y, cutEndPointWS.z);
-			
+
 		btCollisionWorld::ClosestRayResultCallback callback(btVector3(cutStartPointWS.x, cutStartPointWS.y, cutStartPointWS.z), btVector3(cutEndPointWS.x, cutEndPointWS.y, cutEndPointWS.z));
 		engine.dynamicsWorld->rayTest(btVector3(cutStartPointWS.x, cutStartPointWS.y, cutStartPointWS.z), btVector3(cutEndPointWS.x, cutEndPointWS.y, cutEndPointWS.z), callback);
 									
 		if(callback.hasHit())
 		{
-			printf("You have cut something!\n");
-			btBoxShape* shape=(btBoxShape*)callback.m_collisionObject;
-			
-			
+			const btCollisionObject* object=callback.m_collisionObject;
+			const btCollisionShape* collisionShape=object->getCollisionShape();
+			int meshIndex=engine.GetCollisionShapeIndex(collisionShape);
+			if(meshIndex<0)
+				return;
+			printf("La mesh tagliata: %d.\n",meshIndex);
+			glm::mat4 model=engine.GetObjectModelMatrix(meshIndex);
+			cuttableMeshes[meshIndex].Cut(cutStartPointWS, cutEndPointWS, model, view, projection);
 		}
 	}
 	

@@ -69,6 +69,22 @@ public:
 		this->setupMesh();
 	}
     //////////////////////////////////////////
+	
+	Mesh Cut(glm::vec4 cutStartPoint, glm::vec4 cutEndPoint, glm::mat4 model ,glm::mat4 view, glm::mat4 projection)
+	{
+		glm::vec4 cutVector=glm::vec4(cutEndPoint.x-cutStartPoint.x, cutEndPoint.y-cutStartPoint.y, 0, cutEndPoint.w-cutStartPoint.w);
+		glm::vec4 cutNormal=glm::vec4(-cutVector.y, cutVector.x, 0.0f, 0.0f);
+		for(int i=0;i<vertices.size();i++)
+		{		
+			glm::vec4 vertexWs=glm::vec4(vertices[i].Position.x, vertices[i].Position.y, vertices[i].Position.z, 0.0f);
+			glm::vec4 vertexToCutPlane=glm::vec4(vertexWs.x-cutEndPoint.x, vertexWs.y-cutEndPoint.y, 0, 0);
+			float dot=glm::dot(cutNormal, vertexToCutPlane);
+			if(dot>0)
+				printf("Point %f, %f, %f is positive.\n", vertexWs.x, vertexWs.y, vertexWs.z);
+		}
+		
+		return Mesh();
+	}
 
     // rendering of mesh
     void Draw(Shader shader)

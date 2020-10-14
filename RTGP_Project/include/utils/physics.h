@@ -64,7 +64,7 @@ public:
 	
 	glm::mat4 GetObjectModelMatrix(int i)
 	{
-		btCollisionObject* collisionObject = dynamicsWorld->getCollisionObjectArray()[0];
+		btCollisionObject* collisionObject = dynamicsWorld->getCollisionObjectArray()[i];
 		btRigidBody* rigidBody = btRigidBody::upcast(collisionObject);
 		btTransform transform;
 		if (rigidBody && rigidBody->getMotionState())
@@ -105,9 +105,9 @@ public:
 		btScalar mass(1.f);
 		btVector3 localInertia(0, 0, 0);
 		shape->calculateLocalInertia(mass, localInertia);
-		btScalar xModel = ((rand()%101)/101.f)*X_BOUNDARY * ((rand()%2)>0) ? 1 : -1;
+		btScalar xModel = ((rand()%101)/100.f)*X_BOUNDARY * ((rand()%2)>0) ? 1 : -1;
 		btScalar yModel = -5.9;
-		startTransform.setOrigin(btVector3(0, -2, 0));
+		startTransform.setOrigin(btVector3(0, 0, 0));
 		btDefaultMotionState* motionState = new btDefaultMotionState(startTransform);
 		btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, shape, localInertia);
 		rbInfo.m_angularDamping =0.90f;
@@ -130,6 +130,17 @@ public:
 		btCollisionShape* shape=collisionShapes[i];
 		collisionShapes.removeAtIndex(i);
 		delete shape;
+	}
+	
+	int GetCollisionShapeIndex(const btCollisionShape* collisionShape)
+	{
+		for(int i=0; i<collisionShapes.size(); i++)
+		{
+			if(collisionShape==collisionShapes[i])
+				return i;
+		}
+		
+		return -1;
 	}
 
     //////////////////////////////////////////
