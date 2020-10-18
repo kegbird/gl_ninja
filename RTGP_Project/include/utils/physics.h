@@ -107,7 +107,7 @@ public:
 		shape->calculateLocalInertia(mass, localInertia);
 		btScalar xModel = ((rand()%101)/100.f)*X_BOUNDARY * ((rand()%2)>0) ? 1 : -1;
 		btScalar yModel = -5.9;
-		startTransform.setOrigin(btVector3(0, 0, 0));
+		startTransform.setOrigin(btVector3(0, -3, 0));
 		btDefaultMotionState* motionState = new btDefaultMotionState(startTransform);
 		btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, shape, localInertia);
 		rbInfo.m_angularDamping =0.90f;
