@@ -15,12 +15,13 @@ Universita' degli Studi di Milano
 
 #pragma once
 //#define GRAVITY -9.82f
-#define GRAVITY 0.0f
+#define GRAVITY 0.f
 #define X_BOUNDARY 6
 #define X_IMPULSE_BOUNDARY 2
 #define Y_IMPULSE_BOUNDARY 13
 
 #include <glm/glm.hpp>
+#include <btBox2dShape.h>
 #include <glm/gtc/type_ptr.hpp>
 #include <bullet/btBulletDynamicsCommon.h>
 
@@ -87,10 +88,10 @@ public:
 		switch(i)
 		{
 			case 0:
-				shape=new btBoxShape(btVector3(btScalar(1.0f), btScalar(1.0f), btScalar(1.0f)));
+				shape=new btBox2dShape(btVector3(btScalar(1.0f), btScalar(1.0f), btScalar(0.0f)));
 				break;
 			case 1:
-				shape=new btConeShape(btScalar(1.0f), btScalar(2.0f));
+				shape=new btBox2dShape(btVector3(btScalar(1.0f), btScalar(1.0f), btScalar(0.0f)));
 				break;
 			case 2:
 				shape=new btCylinderShape(btVector3(btScalar(1.0f), btScalar(2.0f), btScalar(0.0)));
@@ -107,7 +108,7 @@ public:
 		shape->calculateLocalInertia(mass, localInertia);
 		btScalar xModel = ((rand()%101)/100.f)*X_BOUNDARY * ((rand()%2)>0) ? 1 : -1;
 		btScalar yModel = -5.9;
-		startTransform.setOrigin(btVector3(0, -3, 0));
+		startTransform.setOrigin(btVector3(0, 0, 5));
 		btDefaultMotionState* motionState = new btDefaultMotionState(startTransform);
 		btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, shape, localInertia);
 		rbInfo.m_angularDamping =0.90f;

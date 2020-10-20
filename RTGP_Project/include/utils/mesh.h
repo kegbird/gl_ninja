@@ -18,6 +18,7 @@ Universita' degli Studi di Milano
 using namespace std;
 
 // Std. Includes
+#include <stdlib.h> 
 #include <string>
 #include <fstream>
 #include <sstream>
@@ -49,7 +50,9 @@ struct Vertex {
 	
 	bool Equals(Vertex other)
 	{
-		return GetPosition()==other.GetPosition();
+		float epsilon=0.001f;
+		glm::vec3 otherPosition=other.GetPosition();
+		return (abs(Position.x-other.Position.x)<=epsilon) && (abs(Position.y-other.Position.y)<=epsilon) && (abs(Position.z-other.Position.z)<=epsilon);
 	}
 };
 
@@ -80,28 +83,31 @@ public:
 	}
     //////////////////////////////////////////
 	
-	int ExistPoint(int i, vector<Vertex> ver, vector<GLuint> ind)
+	int ExistVertex(Vertex v, vector<Vertex> ver, vector<GLuint> ind)
 	{
-		for(int j=0;j<ver.size();j++)
+		for(int j=0;j<ver.size();j--)
 		{
-			if(ver[j].Equals(vertices[i]))
+			if(ver[j].Equals(v))
+			{
 				return j;
+			}
 		}
-		
 		return -1;
 	}
 	
-	void AddVertex(int i, vector<Vertex> & ver, vector<GLuint> & ind)
+	int AddVertex(Vertex v, vector<Vertex> & ver, vector<GLuint> & ind)
 	{
-		int j=ExistPoint(i, ver, ind);
+		int j=ExistVertex(v, ver, ind);
 		if(0<=j)
 		{
 			ind.push_back(j);
+			return j;
 		}
 		else
 		{
-			ver.push_back(vertices[i]);
+			ver.push_back(v);
 			ind.push_back(ver.size()-1);
+			return ver.size()-1;
 		}
 	}
 	
@@ -116,77 +122,127 @@ public:
 						int indB, 
 						int indC)
 	{
-		bool a=PositiveOrNegativeSide(indA, planeNormal, planePoint);
-		bool b=PositiveOrNegativeSide(indB, planeNormal, planePoint);
-		bool c=PositiveOrNegativeSide(indC, planeNormal, planePoint);
 		
-		int i, j;
+		//true means positive, false means negative
+		bool a=(PositiveOrNegativeSide(indA, planeNormal, planePoint)>0.f);
+		bool b=(PositiveOrNegativeSide(indB, planeNormal, planePoint)>0.f);
+		bool c=(PositiveOrNegativeSide(indC, planeNormal, planePoint)>0.f);
+		
+		vector<int> pV;
+		vector<int> nV;
 		
 		//6 cases
-	
 		if(a & !b & !c)
 		{
-			//A positive
-			//first triangle
-			AddVertex(indA, positiveMeshVertices, positiveMeshIndices);
-			positiveMeshVertices.push_back(newVertices[0]);
-			positiveMeshIndices.push_back(positiveMeshVertices.size()-1);
-			positiveMeshVertices.push_back(newVertices[1]);
-			positiveMeshIndices.push_back(positiveMeshVertices.size()-1);
-			
-			//second triangle
-			AddVertex(indB, negativeMeshVertices, negativeMeshIndices);
-			negativeMeshVertices.push_back(newVertices[0]);
-			negativeMeshIndices.push_back(negativeMeshVertices.size()-1);
-			int i=negativeMeshIndices[negativeMeshVertices.size()-1];
-			negativeMeshVertices.push_back(newVertices[1]);
-			negativeMeshIndices.push_back(negativeMeshVertices.size()-1);
-			int j=negativeMeshIndices[negativeMeshVertices.size()-1];
-			
-			//third triangle
-			AddVertex(indC, negativeMeshVertices, negativeMeshIndices);
-			negativeMeshIndices.push_back(i);
-			negativeMeshIndices.push_back(j);
-			return;
+			printf("a positive\n");
+			pV.push_back(indA);
+			nV.push_back(indB);
+			nV.push_back(indC);
 		}
 		else if(!a & b & !c)
 		{
-			//B positive
-
+			printf("b positive\n");
+			pV.push_back(indB);
+			nV.push_back(indA);
+			nV.push_back(indC);
 		}
 		else if(!a & !b & c)
 		{
-			//C positive
-			AddVertex(indB, negativeMeshVertices, negativeMeshIndices);
-			negativeMeshVertices.push_back(newVertices[0]);
-			negativeMeshIndices.push_back(negativeMeshVertices.size()-1);
+			printf("c positive\n");
+			pV.push_back(indC);
+			nV.push_back(indB);
+			nV.push_back(indA);
 		}
 		else if(a & b & !c)
 		{
-			//A B positive
+			printf("a b positive\n");
+			pV.push_back(indA);
+			pV.push_back(indB);
+			nV.push_back(indC);
 			
 		}
 		else if(a & !b & c)
 		{
+			printf("a c positive\n");
+			pV.push_back(indC);
+			pV.push_back(indA);
+			nV.push_back(indB);
 			//A C positive
-			AddVertex(indA, negativeMeshVertices, negativeMeshIndices);
-			negativeMeshVertices.push_back(newVertices[0]);
-			negativeMeshIndices.push_back(negativeMeshVertices.size()-1);
+		}
+		else if(!a & b & c)
+		{
+			printf("c b positive\n");
+			pV.push_back(indC);
+			pV.push_back(indB);
+			nV.push_back(indA);		
+			//B C positive
 		}
 		else
-		{				
-			//B C positive
+		{
+			printf("Something went wrong.\n");
+		}
+		
+		//2 triangle above or below the cut?
+		if(pV.size()==2)
+		{
+			//first triangle
+			AddVertex(vertices[nV[0]], negativeMeshVertices, negativeMeshIndices);
+			AddVertex(newVertices[0], negativeMeshVertices, negativeMeshIndices);
+			AddVertex(newVertices[1], negativeMeshVertices, negativeMeshIndices);
+			/*negativeMeshVertices.push_back(newVertices[0]);
+			negativeMeshIndices.push_back(negativeMeshVertices.size()-1);
+			negativeMeshVertices.push_back(newVertices[1]);
+			negativeMeshIndices.push_back(negativeMeshVertices.size()-1);*/
+			
+			int k=AddVertex(vertices[pV[0]], positiveMeshVertices, positiveMeshIndices);
+			AddVertex(vertices[pV[1]], positiveMeshVertices, positiveMeshIndices);
+			int j=AddVertex(newVertices[0], positiveMeshVertices, positiveMeshIndices);
+			
+			/*positiveMeshVertices.push_back(newVertices[0]);
+			positiveMeshIndices.push_back(positiveMeshVertices.size()-1);
+			int j=positiveMeshIndices[positiveMeshIndices.size()-1];*/
+			
+			positiveMeshIndices.push_back(j);
+			AddVertex(newVertices[1], positiveMeshVertices, positiveMeshIndices);
+			positiveMeshIndices.push_back(k);
+		}
+		else
+		{
+			//first triangle
+			AddVertex(vertices[pV[0]], positiveMeshVertices, positiveMeshIndices);
+			AddVertex(newVertices[0], positiveMeshVertices, positiveMeshIndices);
+			AddVertex(newVertices[1], positiveMeshVertices, positiveMeshIndices);
+			/*positiveMeshVertices.push_back(newVertices[0]);
+			positiveMeshIndices.push_back(positiveMeshVertices.size()-1);
+			positiveMeshVertices.push_back(newVertices[1]);
+			positiveMeshIndices.push_back(positiveMeshVertices.size()-1);*/
+			
+			//second triangle
+			int k=AddVertex(vertices[nV[0]], negativeMeshVertices, negativeMeshIndices);
+			AddVertex(newVertices[0], negativeMeshVertices, negativeMeshIndices);
+			int j=AddVertex(newVertices[1], negativeMeshVertices, negativeMeshIndices);
+			
+			/*negativeMeshVertices.push_back(newVertices[0]);
+			negativeMeshIndices.push_back(negativeMeshVertices.size()-1);
+			int i=negativeMeshIndices[negativeMeshVertices.size()-1];*/
+			/*negativeMeshVertices.push_back(newVertices[1]);
+			negativeMeshIndices.push_back(negativeMeshVertices.size()-1);
+			int j=negativeMeshIndices[negativeMeshVertices.size()-1];*/
+			
+			//third triangle
+			AddVertex(vertices[nV[1]], negativeMeshVertices, negativeMeshIndices);
+			negativeMeshIndices.push_back(k);
+			negativeMeshIndices.push_back(j);
 		}
 	}
 	
-	void AddTriangle(vector<GLuint> & ind, vector<Vertex> & ver, int indA, int indB, int indC)
+	void AddExistingTriangle(vector<GLuint> & ind, vector<Vertex> & ver, int indA, int indB, int indC)
 	{
 		bool tmp[3]={false, false, false};
 		for(unsigned int i=0; i<ver.size();i++)
 		{
 			if(ver[i].Equals(vertices[indA]))
 			{
-				printf("Il punto è presente %f, %f, %f\n",vertices[indA].Position.x, vertices[indA].Position.y, vertices[indA].Position.z);
 				ind.push_back(i);
 				tmp[0]=true;
 				continue;
@@ -194,7 +250,6 @@ public:
 			
 			if(ver[i].Equals(vertices[indB]))
 			{
-				printf("Il punto è presente %f, %f, %f\n",vertices[indB].Position.x, vertices[indB].Position.y, vertices[indB].Position.z);
 				ind.push_back(i);
 				tmp[1]=true;
 				continue;
@@ -202,7 +257,6 @@ public:
 			
 			if(ver[i].Equals(vertices[indC]))
 			{
-				printf("Il punto è presente %f, %f, %f\n",vertices[indC].Position.x, vertices[indC].Position.y, vertices[indC].Position.z);
 				ind.push_back(i);
 				tmp[2]=true;
 				continue;
@@ -211,21 +265,18 @@ public:
 		
 		if(!tmp[0])
 		{
-			printf("Il punto non è presente %f, %f, %f\n",vertices[indA].Position.x, vertices[indA].Position.y, vertices[indA].Position.z);
 			ver.push_back(vertices[indA]);
 			ind.push_back(ver.size()-1);
 		}
 		
 		if(!tmp[1])
 		{
-			printf("Il punto non è presente %f, %f, %f\n",vertices[indB].Position.x, vertices[indB].Position.y, vertices[indB].Position.z);
 			ver.push_back(vertices[indB]);
 			ind.push_back(ver.size()-1);
 		}
 		
 		if(!tmp[2])
 		{
-			printf("Il punto non è presente %f, %f, %f\n",vertices[indC].Position.x, vertices[indC].Position.y, vertices[indC].Position.z);
 			ver.push_back(vertices[indC]);
 			ind.push_back(ver.size()-1);
 		}
@@ -242,7 +293,6 @@ public:
 		glm::vec4 cutVector=glm::vec4(cutEndPoint.x-cutStartPoint.x, cutEndPoint.y-cutStartPoint.y, 0, cutEndPoint.w-cutStartPoint.w);
 		glm::vec4 cutNormal=glm::vec4(-cutVector.y, cutVector.x, 0.0f, 0.0f);
 		cutNormal=glm::normalize(cutNormal);
-		//printf("Normal %f, %f, %f is positive.\n", cutNormal.x, cutNormal.y, cutNormal.z);
 		
 		vector<Vertex> negativeMeshVertices;
 		vector<GLuint> negativeMeshIndices;
@@ -268,33 +318,68 @@ public:
 			else
 			{
 				//Separe negative vertices from positive ones since there is no cut
-				if(PositiveOrNegativeSide(indA, cutNormal, cutEndPoint)>0)
+				if(PositiveOrNegativeSide(indA, cutNormal, cutEndPoint)>0.f)
 				{
-					AddTriangle(positiveMeshIndices, positiveMeshVertices, indA, indB, indC);
+					AddExistingTriangle(positiveMeshIndices, positiveMeshVertices, indA, indB, indC);
 					
 				}
 				else
 				{
-					AddTriangle(negativeMeshIndices, negativeMeshVertices, indA, indB, indC);
+					AddExistingTriangle(negativeMeshIndices, negativeMeshVertices, indA, indB, indC);
 				}
 			}
-			
-			/*if(0.0<=d && d<=1.0f)
-			{
-				printf("Aye %f %f,%f,%f %f,%f,%f\n",d, vertices[i].Position.x, vertices[i].Position.y, vertices[i].Position.z, vertices[i+1].Position.x, vertices[i+1].Position.y, vertices[i+1].Position.z);
-			}
-			d=CutEdge(vertices[indices[i+1]].GetPosition(), vertices[indices[i+2]].GetPosition(), cutEndPoint, cutNormal);
-			if(0.0<=d && d<=1.0f)
-			{
-				printf("Aye %f %f,%f,%f %f,%f,%f\n",d, vertices[i+1].Position.x, vertices[i+1].Position.y, vertices[i+1].Position.z, vertices[i+2].Position.x, vertices[i+2].Position.y, vertices[i+2].Position.z);
-			}
-			d=CutEdge(vertices[indices[i]].GetPosition(), vertices[indices[i+2]].GetPosition(), cutEndPoint, cutNormal);
-			if(0.0<=d && d<=1.0f)
-			{
-				printf("Aye %f %f,%f,%f %f,%f,%f\n",d, vertices[i].Position.x, vertices[i].Position.y, vertices[i].Position.z, vertices[i+2].Position.x, vertices[i+2].Position.y, vertices[i+2].Position.z);
-			}*/
 		}
 		
+		/*printf("Slicing done, this is what I produced:\n");
+		printf("Positive mesh\n");
+		for(int i=0;i<positiveMeshIndices.size();i+=3)
+		{
+			int j=positiveMeshIndices[i];
+			glm::vec4 t=positiveMeshVertices[j].GetPosition();
+			printf("%d^ triangle\n",(i/3));
+			printf("I: %d -> V: %f, %f, %f\n",positiveMeshIndices[i], t.x, t.y, t.z);
+			j=positiveMeshIndices[i+1];
+			t=positiveMeshVertices[j].GetPosition();
+			printf("I: %d -> V: %f, %f, %f\n",positiveMeshIndices[i+1], t.x, t.y, t.z);
+			j=positiveMeshIndices[i+2];
+			t=positiveMeshVertices[j].GetPosition();
+			printf("I: %d -> V: %f, %f, %f\n",positiveMeshIndices[i+2], t.x, t.y, t.z);
+		}
+		
+		printf("Negative mesh\n");
+		for(int i=0;i<negativeMeshIndices.size();i+=3)
+		{
+			int j=negativeMeshIndices[i];
+			glm::vec4 t=negativeMeshVertices[j].GetPosition();
+			printf("%d^ triangle\n",(i/3));
+			printf("I: %d -> V: %f, %f, %f\n",negativeMeshIndices[i], t.x, t.y, t.z);
+			j=negativeMeshIndices[i+1];
+			t=negativeMeshVertices[j].GetPosition();
+			printf("I: %d -> V: %f, %f, %f\n",negativeMeshIndices[i+1], t.x, t.y, t.z);
+			j=negativeMeshIndices[i+2];
+			t=negativeMeshVertices[j].GetPosition();
+			printf("I: %d -> V: %f, %f, %f\n",negativeMeshIndices[i+2], t.x, t.y, t.z);
+		}
+		
+		glm::vec4 positiveMeshCentroid;
+		glm::vec4 negativeMeshCentroid;
+		
+		for(int i=0;i<positiveMeshVertices.size();i++)
+		{
+			positiveMeshCentroid+=positiveMeshVertices[i].GetPosition();
+		}
+		positiveMeshCentroid/=positiveMeshVertices.size();
+		
+		for(int i=0;i<negativeMeshVertices.size();i++)
+		{
+			negativeMeshCentroid+=negativeMeshVertices[i].GetPosition();
+		}
+		negativeMeshCentroid/=negativeMeshVertices.size();*/
+		
+		vertices=positiveMeshVertices;
+		indices=positiveMeshIndices;
+		setupMesh();
+	
 		return Mesh();
 	}
 	
@@ -318,7 +403,7 @@ public:
 			tmp.Tangent=vertices[indB].Tangent*d[0]+vertices[indA].Tangent*(1.0f-d[0]);
 			tmp.Bitangent=vertices[indB].Bitangent*d[0]+vertices[indA].Bitangent*(1.0f-d[0]);
 			newVertices.push_back(tmp);
-			printf("New Point %f, %f, %f is negative.\n",tmp.Position.x, tmp.Position.y, tmp.Position.z);
+			//printf("New Point %f, %f, %f is negative.\n",tmp.Position.x, tmp.Position.y, tmp.Position.z);
 		}
 				
 		if(0.0f<d[1] && d[1]<1.0f)
@@ -329,7 +414,7 @@ public:
 			tmp.Tangent=vertices[indC].Tangent*d[1]+vertices[indB].Tangent*(1.0f-d[1]);
 			tmp.Bitangent=vertices[indC].Bitangent*d[1]+vertices[indB].Bitangent*(1.0f-d[1]);
 			newVertices.push_back(tmp);
-			printf("New Point %f, %f, %f is negative.\n",tmp.Position.x, tmp.Position.y, tmp.Position.z);
+			//printf("New Point %f, %f, %f is negative.\n",tmp.Position.x, tmp.Position.y, tmp.Position.z);
 		}
 			
 		if(0.0f<d[2] && d[2]<1.0f)
@@ -340,7 +425,7 @@ public:
 			tmp.Tangent=vertices[indC].Tangent*d[2]+vertices[indA].Tangent*(1.0f-d[2]);
 			tmp.Bitangent=vertices[indC].Bitangent*d[2]+vertices[indA].Bitangent*(1.0f-d[2]);
 			newVertices.push_back(tmp);
-			printf("New Point %f, %f, %f is negative.\n",tmp.Position.x, tmp.Position.y, tmp.Position.z);
+			//printf("New Point %f, %f, %f is negative.\n",tmp.Position.x, tmp.Position.y, tmp.Position.z);
 		}
 		
 		return newVertices;

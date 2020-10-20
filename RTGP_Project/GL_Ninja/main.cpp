@@ -65,7 +65,7 @@ positive Z axis points "outside" the screen
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#define N_MODELS 5
+#define N_MODELS 3
 
 GLuint screenWidth = 1280, screenHeight = 720;
 
@@ -129,12 +129,12 @@ int main()
     glClearColor(0.f, 0.f, 0.f, 1.0f);
 		
 	Shader lineShader("lineShader.vert", "lineShader.frag");
-		
+	
 	// Projection matrix: FOV angle, aspect ratio, near and far planes
 	glm::mat4 projection = glm::perspective(45.0f, (float)screenWidth/(float)screenHeight, 0.1f, 15.0f);
 	glm::mat4 view = glm::lookAt(glm::vec3(0.f, 0.f, 7.f), glm::vec3(0.f, 0.f, 6.f), glm::vec3(0.f, 1.f, 0.f));
-	array<string, N_MODELS> modelPaths={"../../models/untitled.obj","../../models/cone.obj","../../models/cylinder.obj","../../models/icosphere.obj","../../models/sphere.obj"};
-	int modelIndex=0;
+	array<string, N_MODELS> modelPaths={"../../models/square.obj","../../models/circle.obj","../../models/triangle.obj"};
+	int modelIndex=1;
 	
 	Scene scene=Scene(projection, view);
 	

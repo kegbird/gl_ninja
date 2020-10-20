@@ -74,7 +74,7 @@ public:
 		planeShader=Shader("18_phong_tex_multiplelights.vert", "19a_blinnphong_tex_multiplelights.frag");
 		planeTexture=LoadTexture("../../textures/SoilCracked.png");
 		
-		glm::vec4 origin=glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+		glm::vec4 origin=glm::vec4(0.0f, 0.0f, 5.0f, 1.0f);
 		origin=projection*view*origin;
 		origin/=origin.w;
 		cutDepthNDC=origin.z;
