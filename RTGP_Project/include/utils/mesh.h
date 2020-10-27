@@ -52,7 +52,10 @@ struct Vertex {
 	{
 		float epsilon=0.001f;
 		glm::vec3 otherPosition=other.GetPosition();
-		return (abs(Position.x-other.Position.x)<=epsilon) && (abs(Position.y-other.Position.y)<=epsilon) && (abs(Position.z-other.Position.z)<=epsilon);
+		float deltaX=fabs(Position.x-otherPosition.x);
+		float deltaY=fabs(Position.y-otherPosition.y);
+		float deltaZ=fabs(Position.z-otherPosition.z);
+		return (deltaX<=epsilon) && (deltaY<=epsilon) && (deltaZ<=epsilon);
 	}
 };
 
@@ -83,9 +86,32 @@ public:
 	}
     //////////////////////////////////////////
 	
+	glm::vec4 CalculateCentroid(vector<float> triangleAreas, vector<glm::vec3> triangleCentroids, float totalArea, vector<GLuint> ind, vector<Vertex> ver)
+	{
+		glm::vec3 centroid;
+		for(unsigned int i;i<triangleCentroids.size();i++)
+			centroid+=(triangleAreas[i]*triangleCentroids[i]);
+		centroid/=totalArea;
+		return glm::vec4(centroid.x, centroid.y, centroid.z, 1.0f);
+	}
+	
+	float CalculateTriangleArea(Vertex a, Vertex b, Vertex c)
+	{
+		glm::vec3 ab=b.GetPosition()-a.GetPosition();
+		glm::vec3 ac=c.GetPosition()-a.GetPosition();
+		return (fabs(glm::cross(ab, ac).length()))*0.5f;
+	}
+	
+	glm::vec4 CalculateTriangleCentroid(Vertex a, Vertex b, Vertex c)
+	{
+		glm::vec4 triangleCentroid=(a.GetPosition()+b.GetPosition()+c.GetPosition())/3.0f;
+		printf("%f %f %f\n",triangleCentroid.x, triangleCentroid.y, triangleCentroid.z);
+		return triangleCentroid;
+	}
+	
 	int ExistVertex(Vertex v, vector<Vertex> ver, vector<GLuint> ind)
 	{
-		for(int j=0;j<ver.size();j--)
+		for(int j=0;j<ver.size();j++)
 		{
 			if(ver[j].Equals(v))
 			{
@@ -98,6 +124,7 @@ public:
 	int AddVertex(Vertex v, vector<Vertex> & ver, vector<GLuint> & ind)
 	{
 		int j=ExistVertex(v, ver, ind);
+			
 		if(0<=j)
 		{
 			ind.push_back(j);
@@ -115,8 +142,14 @@ public:
 						glm::vec4 planeNormal, 
 						vector<Vertex> & negativeMeshVertices, 
 						vector<GLuint> & negativeMeshIndices, 
+						float & negativeMeshArea,
+						vector<glm::vec3> & negativeTriangleCentroids,
+						vector<float> & negativeTriangleAreas,
 						vector<Vertex> & positiveMeshVertices, 
 						vector<GLuint> & positiveMeshIndices, 
+						float & positiveMeshArea,
+						vector<glm::vec3> & positiveTriangleCentroids,
+						vector<float> & positiveTriangleAreas,
 						vector<Vertex> newVertices, 
 						int indA, 
 						int indB, 
@@ -130,32 +163,29 @@ public:
 		
 		vector<int> pV;
 		vector<int> nV;
+		float triangleArea;
 		
 		//6 cases
 		if(a & !b & !c)
 		{
-			printf("a positive\n");
 			pV.push_back(indA);
 			nV.push_back(indB);
 			nV.push_back(indC);
 		}
 		else if(!a & b & !c)
 		{
-			printf("b positive\n");
 			pV.push_back(indB);
 			nV.push_back(indA);
 			nV.push_back(indC);
 		}
 		else if(!a & !b & c)
 		{
-			printf("c positive\n");
 			pV.push_back(indC);
 			nV.push_back(indB);
 			nV.push_back(indA);
 		}
 		else if(a & b & !c)
 		{
-			printf("a b positive\n");
 			pV.push_back(indA);
 			pV.push_back(indB);
 			nV.push_back(indC);
@@ -163,7 +193,6 @@ public:
 		}
 		else if(a & !b & c)
 		{
-			printf("a c positive\n");
 			pV.push_back(indC);
 			pV.push_back(indA);
 			nV.push_back(indB);
@@ -171,7 +200,6 @@ public:
 		}
 		else if(!a & b & c)
 		{
-			printf("c b positive\n");
 			pV.push_back(indC);
 			pV.push_back(indB);
 			nV.push_back(indA);		
@@ -189,22 +217,29 @@ public:
 			AddVertex(vertices[nV[0]], negativeMeshVertices, negativeMeshIndices);
 			AddVertex(newVertices[0], negativeMeshVertices, negativeMeshIndices);
 			AddVertex(newVertices[1], negativeMeshVertices, negativeMeshIndices);
-			/*negativeMeshVertices.push_back(newVertices[0]);
-			negativeMeshIndices.push_back(negativeMeshVertices.size()-1);
-			negativeMeshVertices.push_back(newVertices[1]);
-			negativeMeshIndices.push_back(negativeMeshVertices.size()-1);*/
 			
+			triangleArea=CalculateTriangleArea(vertices[nV[0]], newVertices[0], newVertices[1]);
+			negativeTriangleAreas.push_back(triangleArea);
+			negativeMeshArea+=triangleArea;
+			negativeTriangleCentroids.push_back(CalculateTriangleCentroid(vertices[nV[0]], newVertices[0], newVertices[1]));
+
 			int k=AddVertex(vertices[pV[0]], positiveMeshVertices, positiveMeshIndices);
 			AddVertex(vertices[pV[1]], positiveMeshVertices, positiveMeshIndices);
 			int j=AddVertex(newVertices[0], positiveMeshVertices, positiveMeshIndices);
 			
-			/*positiveMeshVertices.push_back(newVertices[0]);
-			positiveMeshIndices.push_back(positiveMeshVertices.size()-1);
-			int j=positiveMeshIndices[positiveMeshIndices.size()-1];*/
+			triangleArea=CalculateTriangleArea(vertices[pV[0]], vertices[pV[1]], newVertices[0]);
+			positiveTriangleAreas.push_back(triangleArea);
+			positiveMeshArea+=triangleArea;
+			positiveTriangleCentroids.push_back(CalculateTriangleCentroid(vertices[pV[0]], vertices[pV[1]], newVertices[0]));
 			
 			positiveMeshIndices.push_back(j);
 			AddVertex(newVertices[1], positiveMeshVertices, positiveMeshIndices);
 			positiveMeshIndices.push_back(k);
+			
+			triangleArea=CalculateTriangleArea(vertices[pV[0]], newVertices[1], newVertices[0]);
+			positiveTriangleAreas.push_back(triangleArea);
+			positiveMeshArea+=triangleArea;
+			positiveTriangleCentroids.push_back(CalculateTriangleCentroid(vertices[pV[0]], newVertices[1], newVertices[0]));
 		}
 		else
 		{
@@ -212,31 +247,35 @@ public:
 			AddVertex(vertices[pV[0]], positiveMeshVertices, positiveMeshIndices);
 			AddVertex(newVertices[0], positiveMeshVertices, positiveMeshIndices);
 			AddVertex(newVertices[1], positiveMeshVertices, positiveMeshIndices);
-			/*positiveMeshVertices.push_back(newVertices[0]);
-			positiveMeshIndices.push_back(positiveMeshVertices.size()-1);
-			positiveMeshVertices.push_back(newVertices[1]);
-			positiveMeshIndices.push_back(positiveMeshVertices.size()-1);*/
+			
+			triangleArea=CalculateTriangleArea(vertices[pV[0]], newVertices[0], newVertices[1]);
+			positiveTriangleAreas.push_back(triangleArea);
+			positiveMeshArea+=triangleArea;
+			positiveTriangleCentroids.push_back(CalculateTriangleCentroid(vertices[pV[0]], newVertices[0], newVertices[1]));
 			
 			//second triangle
 			int k=AddVertex(vertices[nV[0]], negativeMeshVertices, negativeMeshIndices);
 			AddVertex(newVertices[0], negativeMeshVertices, negativeMeshIndices);
 			int j=AddVertex(newVertices[1], negativeMeshVertices, negativeMeshIndices);
 			
-			/*negativeMeshVertices.push_back(newVertices[0]);
-			negativeMeshIndices.push_back(negativeMeshVertices.size()-1);
-			int i=negativeMeshIndices[negativeMeshVertices.size()-1];*/
-			/*negativeMeshVertices.push_back(newVertices[1]);
-			negativeMeshIndices.push_back(negativeMeshVertices.size()-1);
-			int j=negativeMeshIndices[negativeMeshVertices.size()-1];*/
+			triangleArea=CalculateTriangleArea(vertices[nV[0]], newVertices[0], newVertices[1]);
+			negativeTriangleAreas.push_back(triangleArea);
+			negativeMeshArea+=triangleArea;
+			negativeTriangleCentroids.push_back(CalculateTriangleCentroid(vertices[nV[0]], newVertices[0], newVertices[1]));
 			
 			//third triangle
 			AddVertex(vertices[nV[1]], negativeMeshVertices, negativeMeshIndices);
 			negativeMeshIndices.push_back(k);
 			negativeMeshIndices.push_back(j);
+			
+			triangleArea=CalculateTriangleArea(vertices[nV[1]], vertices[nV[0]], newVertices[1]);
+			negativeTriangleAreas.push_back(triangleArea);
+			negativeMeshArea+=triangleArea;
+			negativeTriangleCentroids.push_back(CalculateTriangleCentroid(vertices[nV[1]], vertices[nV[0]], newVertices[1]));
 		}
 	}
 	
-	void AddExistingTriangle(vector<GLuint> & ind, vector<Vertex> & ver, int indA, int indB, int indC)
+	void AddExistingTriangle(vector<float> & triangleAreas, vector<glm::vec3> & triangleCentroids, float & area, vector<GLuint> & ind, vector<Vertex> & ver, int indA, int indB, int indC)
 	{
 		bool tmp[3]={false, false, false};
 		for(unsigned int i=0; i<ver.size();i++)
@@ -280,6 +319,15 @@ public:
 			ver.push_back(vertices[indC]);
 			ind.push_back(ver.size()-1);
 		}
+		
+		int i=ind[ind.size()-3];
+		int j=ind[ind.size()-2];
+		int k=ind[ind.size()-1];
+		
+		float triangleArea=CalculateTriangleArea(ver[i], ver[j], ver[k]);
+		triangleAreas.push_back(triangleArea);
+		area+=triangleArea;
+		triangleCentroids.push_back(CalculateTriangleCentroid(ver[i], ver[j], ver[k]));
 	}
 	
 	Mesh Cut(glm::vec4 cutStartPoint, glm::vec4 cutEndPoint, glm::mat4 model ,glm::mat4 view, glm::mat4 projection)
@@ -294,6 +342,14 @@ public:
 		glm::vec4 cutNormal=glm::vec4(-cutVector.y, cutVector.x, 0.0f, 0.0f);
 		cutNormal=glm::normalize(cutNormal);
 		
+		float positiveMeshArea;
+		float negativeMeshArea;
+		vector<glm::vec3> positiveTriangleCentroids;
+		vector<float> positiveTriangleAreas;
+		vector<glm::vec3> negativeTriangleCentroids;
+		vector<float> negativeTriangleAreas;
+		glm::vec4 negativeMeshCentroid;
+		glm::vec4 positiveMeshCentroid;
 		vector<Vertex> negativeMeshVertices;
 		vector<GLuint> negativeMeshIndices;
 		vector<Vertex> positiveMeshVertices;
@@ -303,79 +359,62 @@ public:
 		float d[3]={0.f, 0.f, 0.f};
 		
 		Vertex tmp;
-		for(int i=0;i<indices.size();i+=3)
+		for(unsigned int i=0;i<indices.size();i+=3)
 		{
 			int indA=indices[i];
 			int indB=indices[i+1];
 			int indC=indices[i+2];
 			
 			if(CutTriangle(d, i, cutEndPoint, cutNormal))
-			{				
+			{	
 				vector<Vertex> newVertices;
 				newVertices=CalculateNewVertices(cutNormal, cutEndPoint, negativeMeshVertices, negativeMeshIndices, positiveMeshVertices, positiveMeshIndices, indA, indB, indC, d);
-				AddNewTriangle(cutEndPoint, cutNormal, negativeMeshVertices, negativeMeshIndices, positiveMeshVertices, positiveMeshIndices, newVertices, indA, indB, indC);
+				AddNewTriangle(cutEndPoint, 
+								cutNormal, 
+								negativeMeshVertices, 
+								negativeMeshIndices, 
+								negativeMeshArea, 
+								negativeTriangleCentroids, 
+								negativeTriangleAreas, 
+								positiveMeshVertices, 
+								positiveMeshIndices, 
+								positiveMeshArea, 
+								positiveTriangleCentroids, 
+								positiveTriangleAreas, 
+								newVertices, 
+								indA, 
+								indB, 
+								indC);
 			}
 			else
 			{
 				//Separe negative vertices from positive ones since there is no cut
 				if(PositiveOrNegativeSide(indA, cutNormal, cutEndPoint)>0.f)
-				{
-					AddExistingTriangle(positiveMeshIndices, positiveMeshVertices, indA, indB, indC);
-					
-				}
+					AddExistingTriangle(positiveTriangleAreas, positiveTriangleCentroids, positiveMeshArea, positiveMeshIndices, positiveMeshVertices, indA, indB, indC);
 				else
-				{
-					AddExistingTriangle(negativeMeshIndices, negativeMeshVertices, indA, indB, indC);
-				}
+					AddExistingTriangle(negativeTriangleAreas, negativeTriangleCentroids, negativeMeshArea, negativeMeshIndices, negativeMeshVertices, indA, indB, indC);
 			}
 		}
 		
-		/*printf("Slicing done, this is what I produced:\n");
-		printf("Positive mesh\n");
-		for(int i=0;i<positiveMeshIndices.size();i+=3)
+		negativeMeshCentroid=CalculateCentroid(negativeTriangleAreas, negativeTriangleCentroids, negativeMeshArea, negativeMeshIndices, negativeMeshVertices);
+		positiveMeshCentroid=CalculateCentroid(positiveTriangleAreas, positiveTriangleCentroids, positiveMeshArea, positiveMeshIndices, positiveMeshVertices);
+		
+		for(unsigned int i=0;i<positiveMeshVertices.size();i++)
 		{
-			int j=positiveMeshIndices[i];
-			glm::vec4 t=positiveMeshVertices[j].GetPosition();
-			printf("%d^ triangle\n",(i/3));
-			printf("I: %d -> V: %f, %f, %f\n",positiveMeshIndices[i], t.x, t.y, t.z);
-			j=positiveMeshIndices[i+1];
-			t=positiveMeshVertices[j].GetPosition();
-			printf("I: %d -> V: %f, %f, %f\n",positiveMeshIndices[i+1], t.x, t.y, t.z);
-			j=positiveMeshIndices[i+2];
-			t=positiveMeshVertices[j].GetPosition();
-			printf("I: %d -> V: %f, %f, %f\n",positiveMeshIndices[i+2], t.x, t.y, t.z);
+			positiveMeshVertices[i].Position.x-=positiveMeshCentroid.x;
+			positiveMeshVertices[i].Position.y-=positiveMeshCentroid.y;
+			positiveMeshVertices[i].Position.z-=positiveMeshCentroid.z;
 		}
 		
-		printf("Negative mesh\n");
-		for(int i=0;i<negativeMeshIndices.size();i+=3)
+		for(unsigned int i=0;i<negativeMeshVertices.size();i++)
 		{
-			int j=negativeMeshIndices[i];
-			glm::vec4 t=negativeMeshVertices[j].GetPosition();
-			printf("%d^ triangle\n",(i/3));
-			printf("I: %d -> V: %f, %f, %f\n",negativeMeshIndices[i], t.x, t.y, t.z);
-			j=negativeMeshIndices[i+1];
-			t=negativeMeshVertices[j].GetPosition();
-			printf("I: %d -> V: %f, %f, %f\n",negativeMeshIndices[i+1], t.x, t.y, t.z);
-			j=negativeMeshIndices[i+2];
-			t=negativeMeshVertices[j].GetPosition();
-			printf("I: %d -> V: %f, %f, %f\n",negativeMeshIndices[i+2], t.x, t.y, t.z);
+			negativeMeshVertices[i].Position.x-=negativeMeshCentroid.x;
+			negativeMeshVertices[i].Position.y-=negativeMeshCentroid.y;
+			negativeMeshVertices[i].Position.z-=negativeMeshCentroid.z;
 		}
-		
-		glm::vec4 positiveMeshCentroid;
-		glm::vec4 negativeMeshCentroid;
-		
-		for(int i=0;i<positiveMeshVertices.size();i++)
-		{
-			positiveMeshCentroid+=positiveMeshVertices[i].GetPosition();
-		}
-		positiveMeshCentroid/=positiveMeshVertices.size();
-		
-		for(int i=0;i<negativeMeshVertices.size();i++)
-		{
-			negativeMeshCentroid+=negativeMeshVertices[i].GetPosition();
-		}
-		negativeMeshCentroid/=negativeMeshVertices.size();*/
-		
+	
+		printf("Positive mesh centroid: %f %f %f \n", positiveMeshCentroid.x, positiveMeshCentroid.y, positiveMeshCentroid.z);
+		printf("Negative mesh centroid: %f %f %f \n", negativeMeshCentroid.x, negativeMeshCentroid.y, negativeMeshCentroid.z);
 		vertices=positiveMeshVertices;
 		indices=positiveMeshIndices;
 		setupMesh();
