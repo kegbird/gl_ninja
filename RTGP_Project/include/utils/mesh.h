@@ -29,6 +29,7 @@ using namespace std;
 #include <glad/glad.h> // Contains all the necessery OpenGL includes
 // we use GLM data structures to write data in the VBO, VAO and EBO buffers
 #include <glm/glm.hpp>
+#include <btConvexHullShape.h>
 
 // data structure for vertices
 struct Vertex {
@@ -86,27 +87,29 @@ public:
 	}
     //////////////////////////////////////////
 	
-	glm::vec4 CalculateCentroid(vector<float> triangleAreas, vector<glm::vec3> triangleCentroids, float totalArea, vector<GLuint> ind, vector<Vertex> ver)
+	glm::vec4 CalculateCentroid(float area, vector<float> triangleAreas, vector<glm::vec3> triangleCentroids, vector<GLuint> ind, vector<Vertex> ver)
 	{
 		glm::vec3 centroid;
-		for(unsigned int i;i<triangleCentroids.size();i++)
+		for(unsigned int i=0;i<triangleCentroids.size();i++)
+		{
 			centroid+=(triangleAreas[i]*triangleCentroids[i]);
-		centroid/=totalArea;
+		}
+		centroid/=area;
 		return glm::vec4(centroid.x, centroid.y, centroid.z, 1.0f);
 	}
 	
 	float CalculateTriangleArea(Vertex a, Vertex b, Vertex c)
 	{
-		glm::vec3 ab=b.GetPosition()-a.GetPosition();
-		glm::vec3 ac=c.GetPosition()-a.GetPosition();
-		return (fabs(glm::cross(ab, ac).length()))*0.5f;
+		glm::vec3 ba=b.GetPosition()-a.GetPosition();
+		glm::vec3 ca=c.GetPosition()-a.GetPosition();
+		glm::vec3 cross=glm::cross(ba, ca);
+		return (glm::sqrt(cross.x*cross.x+cross.y*cross.y+cross.z*cross.z))*0.5f;
 	}
 	
-	glm::vec4 CalculateTriangleCentroid(Vertex a, Vertex b, Vertex c)
+	glm::vec3 CalculateTriangleCentroid(Vertex a, Vertex b, Vertex c)
 	{
 		glm::vec4 triangleCentroid=(a.GetPosition()+b.GetPosition()+c.GetPosition())/3.0f;
-		printf("%f %f %f\n",triangleCentroid.x, triangleCentroid.y, triangleCentroid.z);
-		return triangleCentroid;
+		return glm::vec3(triangleCentroid.x, triangleCentroid.y, triangleCentroid.z);
 	}
 	
 	int ExistVertex(Vertex v, vector<Vertex> ver, vector<GLuint> ind)
@@ -205,10 +208,6 @@ public:
 			nV.push_back(indA);		
 			//B C positive
 		}
-		else
-		{
-			printf("Something went wrong.\n");
-		}
 		
 		//2 triangle above or below the cut?
 		if(pV.size()==2)
@@ -275,7 +274,7 @@ public:
 		}
 	}
 	
-	void AddExistingTriangle(vector<float> & triangleAreas, vector<glm::vec3> & triangleCentroids, float & area, vector<GLuint> & ind, vector<Vertex> & ver, int indA, int indB, int indC)
+	void AddExistingTriangle(vector<float> & triangleAreas, vector<glm::vec3> & triangleCentroids, float & totalArea, vector<GLuint> & ind, vector<Vertex> & ver, int indA, int indB, int indC)
 	{
 		bool tmp[3]={false, false, false};
 		for(unsigned int i=0; i<ver.size();i++)
@@ -323,14 +322,14 @@ public:
 		int i=ind[ind.size()-3];
 		int j=ind[ind.size()-2];
 		int k=ind[ind.size()-1];
-		
 		float triangleArea=CalculateTriangleArea(ver[i], ver[j], ver[k]);
 		triangleAreas.push_back(triangleArea);
-		area+=triangleArea;
-		triangleCentroids.push_back(CalculateTriangleCentroid(ver[i], ver[j], ver[k]));
+		totalArea+=triangleArea;
+		glm::vec3 triangleCentroid=CalculateTriangleCentroid(ver[i], ver[j], ver[k]);
+		triangleCentroids.push_back(triangleCentroid);
 	}
 	
-	Mesh Cut(glm::vec4 cutStartPoint, glm::vec4 cutEndPoint, glm::mat4 model ,glm::mat4 view, glm::mat4 projection)
+	Mesh Cut(glm::vec4 cutStartPoint, glm::vec4 cutEndPoint, glm::mat4 model ,glm::mat4 view, glm::mat4 projection, btConvexHullShape* positiveConvexHullShape, btConvexHullShape* negativeConvexHullShape)
 	{
 		//Convert world vertices to model space
 		glm::mat4 invModel=glm::inverse(model);
@@ -355,8 +354,9 @@ public:
 		vector<Vertex> positiveMeshVertices;
 		vector<GLuint> positiveMeshIndices;
 		glm::vec4 vertex;
-		float dot;
 		float d[3]={0.f, 0.f, 0.f};
+		positiveConvexHullShape=new btConvexHullShape();
+		negativeConvexHullShape=new btConvexHullShape();
 		
 		Vertex tmp;
 		for(unsigned int i=0;i<indices.size();i+=3)
@@ -369,7 +369,7 @@ public:
 			{	
 				vector<Vertex> newVertices;
 				newVertices=CalculateNewVertices(cutNormal, cutEndPoint, negativeMeshVertices, negativeMeshIndices, positiveMeshVertices, positiveMeshIndices, indA, indB, indC, d);
-				AddNewTriangle(cutEndPoint, 
+				AddNewTriangle(	cutEndPoint, 
 								cutNormal, 
 								negativeMeshVertices, 
 								negativeMeshIndices, 
@@ -396,8 +396,8 @@ public:
 			}
 		}
 		
-		negativeMeshCentroid=CalculateCentroid(negativeTriangleAreas, negativeTriangleCentroids, negativeMeshArea, negativeMeshIndices, negativeMeshVertices);
-		positiveMeshCentroid=CalculateCentroid(positiveTriangleAreas, positiveTriangleCentroids, positiveMeshArea, positiveMeshIndices, positiveMeshVertices);
+		negativeMeshCentroid=CalculateCentroid(negativeMeshArea, negativeTriangleAreas, negativeTriangleCentroids, negativeMeshIndices, negativeMeshVertices);
+		positiveMeshCentroid=CalculateCentroid(positiveMeshArea, positiveTriangleAreas, positiveTriangleCentroids, positiveMeshIndices, positiveMeshVertices);
 		
 		for(unsigned int i=0;i<positiveMeshVertices.size();i++)
 		{
@@ -413,13 +413,11 @@ public:
 			negativeMeshVertices[i].Position.z-=negativeMeshCentroid.z;
 		}
 	
-		printf("Positive mesh centroid: %f %f %f \n", positiveMeshCentroid.x, positiveMeshCentroid.y, positiveMeshCentroid.z);
-		printf("Negative mesh centroid: %f %f %f \n", negativeMeshCentroid.x, negativeMeshCentroid.y, negativeMeshCentroid.z);
 		vertices=positiveMeshVertices;
 		indices=positiveMeshIndices;
 		setupMesh();
 	
-		return Mesh();
+		return Mesh(negativeMeshVertices, negativeMeshIndices, textures);
 	}
 	
 	float PositiveOrNegativeSide(int i, glm::vec4 planeNormal, glm::vec4 planePoint)
@@ -442,7 +440,6 @@ public:
 			tmp.Tangent=vertices[indB].Tangent*d[0]+vertices[indA].Tangent*(1.0f-d[0]);
 			tmp.Bitangent=vertices[indB].Bitangent*d[0]+vertices[indA].Bitangent*(1.0f-d[0]);
 			newVertices.push_back(tmp);
-			//printf("New Point %f, %f, %f is negative.\n",tmp.Position.x, tmp.Position.y, tmp.Position.z);
 		}
 				
 		if(0.0f<d[1] && d[1]<1.0f)
@@ -453,7 +450,6 @@ public:
 			tmp.Tangent=vertices[indC].Tangent*d[1]+vertices[indB].Tangent*(1.0f-d[1]);
 			tmp.Bitangent=vertices[indC].Bitangent*d[1]+vertices[indB].Bitangent*(1.0f-d[1]);
 			newVertices.push_back(tmp);
-			//printf("New Point %f, %f, %f is negative.\n",tmp.Position.x, tmp.Position.y, tmp.Position.z);
 		}
 			
 		if(0.0f<d[2] && d[2]<1.0f)
@@ -464,7 +460,6 @@ public:
 			tmp.Tangent=vertices[indC].Tangent*d[2]+vertices[indA].Tangent*(1.0f-d[2]);
 			tmp.Bitangent=vertices[indC].Bitangent*d[2]+vertices[indA].Bitangent*(1.0f-d[2]);
 			newVertices.push_back(tmp);
-			//printf("New Point %f, %f, %f is negative.\n",tmp.Position.x, tmp.Position.y, tmp.Position.z);
 		}
 		
 		return newVertices;

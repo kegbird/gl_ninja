@@ -21,7 +21,8 @@ Universita' degli Studi di Milano
 #define Y_IMPULSE_BOUNDARY 13
 
 #include <glm/glm.hpp>
-#include <btBox2dShape.h>
+#include <btConvex2dShape.h>
+#include <btConvexShape.h>
 #include <glm/gtc/type_ptr.hpp>
 #include <bullet/btBulletDynamicsCommon.h>
 
@@ -82,24 +83,18 @@ public:
 		return glm::make_mat4(glmTransform);
 	}
 	
-	void AddRigidBodyWithImpulse(int i)
+	void AddRigidBodyWithImpulse(Mesh mesh)
 	{
-		btCollisionShape* shape;
-		switch(i)
+		btConvexHullShape* base=new btConvexHullShape();
+		
+		for(int i=0; i<mesh.vertices.size();i++)
 		{
-			case 0:
-				shape=new btBox2dShape(btVector3(btScalar(1.0f), btScalar(1.0f), btScalar(0.0f)));
-				break;
-			case 1:
-				shape=new btBox2dShape(btVector3(btScalar(1.0f), btScalar(1.0f), btScalar(0.0f)));
-				break;
-			case 2:
-				shape=new btCylinderShape(btVector3(btScalar(1.0f), btScalar(2.0f), btScalar(0.0)));
-				break;
-			default:
-				shape=new btSphereShape(btScalar(1.0f));
-				break;
+			Vertex vertex = mesh.vertices[i];
+			base->addPoint(btVector3(vertex.Position.x, vertex.Position.y, vertex.Position.z));
 		}
+		
+		btConvex2dShape* shape=new btConvex2dShape(base);
+
 		collisionShapes.push_back(shape);
 		btTransform startTransform;
 		startTransform.setIdentity();

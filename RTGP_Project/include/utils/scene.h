@@ -20,6 +20,7 @@ Universita' degli Studi di Milano
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <bullet/btBulletDynamicsCommon.h>
+#include <btConvexShape.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image/stb_image.h>
 #define N_LIGHTS 3
@@ -114,7 +115,7 @@ public:
 		Model* object = new Model(meshPath);
 		std::vector<Mesh>::iterator cuttableMeshesIt=cuttableMeshes.begin();
 		cuttableMeshes.insert(cuttableMeshesIt, object->meshes.begin(), object->meshes.end());
-		engine.AddRigidBodyWithImpulse(meshIndex);
+		engine.AddRigidBodyWithImpulse(cuttableMeshes.back());
 	}
 	
 	bool AllMeshRemoved()
@@ -145,9 +146,14 @@ public:
 				int meshIndex=engine.GetCollisionShapeIndex(collisionShape);
 				if(meshIndex<0)
 					continue;
+					
 				printf("La mesh tagliata: %d.\n",meshIndex);
 				glm::mat4 model=engine.GetObjectModelMatrix(meshIndex);
-				cuttableMeshes[meshIndex].Cut(cutStartPointWS, cutEndPointWS, model, view, projection);
+				
+				btConvexHullShape* positiveShape;
+				btConvexHullShape* negativeShape;
+				Mesh negativeMesh;
+				negativeMesh=cuttableMeshes[meshIndex].Cut(cutStartPointWS, cutEndPointWS, model, view, projection, positiveShape, negativeShape);
 			}
 		}
 	}
