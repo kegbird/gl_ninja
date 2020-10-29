@@ -14,8 +14,8 @@ Universita' degli Studi di Milano
 */
 
 #pragma once
-//#define GRAVITY -9.82f
-#define GRAVITY 0.f
+#define GRAVITY -9.82f
+#define CUT_IMPULSE 0.25f
 #define X_BOUNDARY 6
 #define X_IMPULSE_BOUNDARY 2
 #define Y_IMPULSE_BOUNDARY 13
@@ -24,6 +24,7 @@ Universita' degli Studi di Milano
 #include <btConvex2dShape.h>
 #include <btConvexShape.h>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
 #include <bullet/btBulletDynamicsCommon.h>
 
 ///////////////////  Physics class ///////////////////////
@@ -83,18 +84,51 @@ public:
 		return glm::make_mat4(glmTransform);
 	}
 	
+	void CutShapeWithImpulse(glm::vec3 cutNormal, int i, glm::mat4 model, float negativeWeightFactor, glm::vec4 negativeMeshPosition, btConvexHullShape* negativeConvexHullShape, float positiveWeightFactor, glm::vec4 positiveMeshPosition, btConvexHullShape* positiveConvexHullShape)
+	{
+		btCollisionObject* cuttedCollisionObject = dynamicsWorld->getCollisionObjectArray()[i];
+		RemoveRigidBodyAtIndex(i);
+		collisionShapes.push_back(positiveConvexHullShape);
+		collisionShapes.push_back(negativeConvexHullShape);
+		btRigidBody* cuttedRigidBody = btRigidBody::upcast(cuttedCollisionObject);
+		btTransform positiveTransform;
+		btTransform negativeTransform;
+		if (cuttedRigidBody && cuttedRigidBody->getMotionState())
+		{
+			//By doing this we adjust rotation for both sections
+			cuttedRigidBody->getMotionState()->getWorldTransform(positiveTransform);
+			cuttedRigidBody->getMotionState()->getWorldTransform(negativeTransform);
+		}
+		positiveTransform.setOrigin(btVector3(positiveMeshPosition.x, positiveMeshPosition.y, positiveMeshPosition.z));
+		negativeTransform.setOrigin(btVector3(negativeMeshPosition.x, negativeMeshPosition.y, negativeMeshPosition.z));
+		
+		btScalar positiveMass(positiveWeightFactor);
+		btScalar negativeMass(negativeWeightFactor);
+		btVector3 localInertia(0, 0, 0);
+		btDefaultMotionState* positiveMotionState = new btDefaultMotionState(positiveTransform);
+		btDefaultMotionState* negativeMotionState = new btDefaultMotionState(negativeTransform);
+		
+		btRigidBody::btRigidBodyConstructionInfo positiveRbInfo(positiveMass, positiveMotionState, positiveConvexHullShape, localInertia);
+		btRigidBody::btRigidBodyConstructionInfo negativeRbInfo(negativeMass, negativeMotionState, negativeConvexHullShape, localInertia);
+		positiveRbInfo.m_angularDamping = negativeRbInfo.m_angularDamping = 0.9f;
+		btRigidBody* positiveRb = new btRigidBody(positiveRbInfo);
+		btRigidBody* negativeRb = new btRigidBody(negativeRbInfo);
+		positiveRb->applyImpulse(btVector3(cutNormal.x, cutNormal.y, cutNormal.z)*btScalar(CUT_IMPULSE), btVector3(0.f, 0.f, 0.f));
+		negativeRb->applyImpulse(btVector3(-cutNormal.x, -cutNormal.y, -cutNormal.z)*btScalar(CUT_IMPULSE), btVector3(0.f, 0.f, 0.f));
+		dynamicsWorld->addRigidBody(positiveRb);
+		dynamicsWorld->addRigidBody(negativeRb);
+	}
+	
 	void AddRigidBodyWithImpulse(Mesh mesh)
 	{
 		btConvexHullShape* base=new btConvexHullShape();
 		
-		for(int i=0; i<mesh.vertices.size();i++)
+		for(unsigned int i=0; i<mesh.vertices.size();i++)
 		{
 			Vertex vertex = mesh.vertices[i];
 			base->addPoint(btVector3(vertex.Position.x, vertex.Position.y, vertex.Position.z));
 		}
-		
 		btConvex2dShape* shape=new btConvex2dShape(base);
-
 		collisionShapes.push_back(shape);
 		btTransform startTransform;
 		startTransform.setIdentity();
@@ -103,7 +137,7 @@ public:
 		shape->calculateLocalInertia(mass, localInertia);
 		btScalar xModel = ((rand()%101)/100.f)*X_BOUNDARY * ((rand()%2)>0) ? 1 : -1;
 		btScalar yModel = -5.9;
-		startTransform.setOrigin(btVector3(0, 0, 5));
+		startTransform.setOrigin(btVector3(xModel, yModel, 0));
 		btDefaultMotionState* motionState = new btDefaultMotionState(startTransform);
 		btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, shape, localInertia);
 		rbInfo.m_angularDamping =0.90f;
@@ -112,20 +146,20 @@ public:
 		dynamicsWorld->addRigidBody(body);
 		btScalar xImpulse = ((rand()%101)/101.f)*X_IMPULSE_BOUNDARY * ((rand()%2)>0) ? 1 : -1;
 		btScalar yImpulse = Y_IMPULSE_BOUNDARY;
-		//body->applyImpulse(btVector3(xImpulse,yImpulse,0), btVector3(1,0,0));
+		body->applyImpulse(btVector3(xImpulse,yImpulse,0), btVector3(1.f,0,0));
 	}
 	
 	void RemoveRigidBodyAtIndex(int i)
 	{
-		printf("Coll. objects: %d.\n", dynamicsWorld->getCollisionObjectArray().size());
 		btCollisionObject* collisionObject = dynamicsWorld->getCollisionObjectArray()[i];
 		dynamicsWorld->removeCollisionObject(collisionObject);
 		delete collisionObject;
+		printf("Coll. objects: %d.\n", dynamicsWorld->getCollisionObjectArray().size());
 		
-		printf("Coll. shapes: %d.\n", collisionShapes.size());
 		btCollisionShape* shape=collisionShapes[i];
 		collisionShapes.removeAtIndex(i);
 		delete shape;
+		printf("Coll. shapes: %d.\n", collisionShapes.size());
 	}
 	
 	int GetCollisionShapeIndex(const btCollisionShape* collisionShape)

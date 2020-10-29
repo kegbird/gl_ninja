@@ -75,7 +75,7 @@ public:
 		planeShader=Shader("18_phong_tex_multiplelights.vert", "19a_blinnphong_tex_multiplelights.frag");
 		planeTexture=LoadTexture("../../textures/SoilCracked.png");
 		
-		glm::vec4 origin=glm::vec4(0.0f, 0.0f, 5.0f, 1.0f);
+		glm::vec4 origin=glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 		origin=projection*view*origin;
 		origin/=origin.w;
 		cutDepthNDC=origin.z;
@@ -150,10 +150,27 @@ public:
 				printf("La mesh tagliata: %d.\n",meshIndex);
 				glm::mat4 model=engine.GetObjectModelMatrix(meshIndex);
 				
-				btConvexHullShape* positiveShape;
-				btConvexHullShape* negativeShape;
+				btConvexHullShape* positiveConvexHullShape;
+				btConvexHullShape* negativeConvexHullShape;
+				glm::vec4 positiveMeshPositionWS;
+				glm::vec4 negativeMeshPositionWS;
 				Mesh negativeMesh;
-				negativeMesh=cuttableMeshes[meshIndex].Cut(cutStartPointWS, cutEndPointWS, model, view, projection, positiveShape, negativeShape);
+				float positiveWeightFactor;
+				float negativeWeightFactor;
+				negativeMesh=cuttableMeshes[meshIndex].Cut(positiveMeshPositionWS, 
+															negativeMeshPositionWS, 
+															cutStartPointWS, 
+															cutEndPointWS, 
+															model, 
+															view, 
+															projection, 
+															positiveConvexHullShape, 
+															negativeConvexHullShape, 
+															positiveWeightFactor, 
+															negativeWeightFactor);
+				glm::vec3 cutNormal=glm::vec3(-1*(cutEndPointWS.y-cutStartPointWS.y), cutEndPointWS.x-cutStartPointWS.x, 0.0f);
+				engine.CutShapeWithImpulse(cutNormal, meshIndex, model, negativeWeightFactor, negativeMeshPositionWS, negativeConvexHullShape, positiveWeightFactor, positiveMeshPositionWS, positiveConvexHullShape);
+				cuttableMeshes.push_back(negativeMesh);
 			}
 		}
 	}

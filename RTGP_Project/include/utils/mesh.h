@@ -329,18 +329,17 @@ public:
 		triangleCentroids.push_back(triangleCentroid);
 	}
 	
-	Mesh Cut(glm::vec4 cutStartPoint, glm::vec4 cutEndPoint, glm::mat4 model ,glm::mat4 view, glm::mat4 projection, btConvexHullShape* positiveConvexHullShape, btConvexHullShape* negativeConvexHullShape)
+	Mesh Cut(glm::vec4 & positiveMeshPosition, glm::vec4 & negativeMeshPosition, glm::vec4 cutStartPoint, glm::vec4 cutEndPoint, glm::mat4 model ,glm::mat4 view, glm::mat4 projection, btConvexHullShape* & positiveConvexHullShape, btConvexHullShape* & negativeConvexHullShape, float & positiveWeightFactor, float & negativeWeightFactor)
 	{
-		//Convert world vertices to model space
+		//Convert world vertices to object space
 		glm::mat4 invModel=glm::inverse(model);
 		cutStartPoint=invModel*cutStartPoint;
 		cutEndPoint=invModel*cutEndPoint;
-		//The calculate the normal in model space
-		glm::vec4 vertexToCutPlane;
+		//The calculate the normal in object space
 		glm::vec4 cutVector=glm::vec4(cutEndPoint.x-cutStartPoint.x, cutEndPoint.y-cutStartPoint.y, 0, cutEndPoint.w-cutStartPoint.w);
 		glm::vec4 cutNormal=glm::vec4(-cutVector.y, cutVector.x, 0.0f, 0.0f);
 		cutNormal=glm::normalize(cutNormal);
-		
+						
 		float positiveMeshArea;
 		float negativeMeshArea;
 		vector<glm::vec3> positiveTriangleCentroids;
@@ -404,6 +403,7 @@ public:
 			positiveMeshVertices[i].Position.x-=positiveMeshCentroid.x;
 			positiveMeshVertices[i].Position.y-=positiveMeshCentroid.y;
 			positiveMeshVertices[i].Position.z-=positiveMeshCentroid.z;
+			positiveConvexHullShape->addPoint(btVector3(positiveMeshVertices[i].Position.x, positiveMeshVertices[i].Position.y, positiveMeshVertices[i].Position.z));
 		}
 		
 		for(unsigned int i=0;i<negativeMeshVertices.size();i++)
@@ -411,12 +411,18 @@ public:
 			negativeMeshVertices[i].Position.x-=negativeMeshCentroid.x;
 			negativeMeshVertices[i].Position.y-=negativeMeshCentroid.y;
 			negativeMeshVertices[i].Position.z-=negativeMeshCentroid.z;
+			negativeConvexHullShape->addPoint(btVector3(negativeMeshVertices[i].Position.x, negativeMeshVertices[i].Position.y, negativeMeshVertices[i].Position.z));
 		}
 	
 		vertices=positiveMeshVertices;
 		indices=positiveMeshIndices;
 		setupMesh();
-	
+		
+		positiveWeightFactor=positiveMeshArea/(positiveMeshArea+negativeMeshArea);
+		negativeWeightFactor=1-positiveWeightFactor;
+		
+		positiveMeshPosition=model*positiveMeshCentroid;
+		negativeMeshPosition=model*negativeMeshCentroid;
 		return Mesh(negativeMeshVertices, negativeMeshIndices, textures);
 	}
 	
