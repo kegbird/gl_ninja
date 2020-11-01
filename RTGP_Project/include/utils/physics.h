@@ -70,35 +70,28 @@ public:
 		btCollisionObject* collisionObject = dynamicsWorld->getCollisionObjectArray()[i];
 		btRigidBody* rigidBody = btRigidBody::upcast(collisionObject);
 		btTransform transform;
-		if (rigidBody && rigidBody->getMotionState())
-		{
-			rigidBody->getMotionState()->getWorldTransform(transform);
-		}
-		else
-		{
-			transform = collisionObject->getWorldTransform();
-		}
-		
+		transform = collisionObject->getWorldTransform();
 		float glmTransform[16];
 		transform.getOpenGLMatrix(glmTransform);
 		return glm::make_mat4(glmTransform);
 	}
 	
 	void CutShapeWithImpulse(glm::vec3 cutNormal, int i, glm::mat4 model, float negativeWeightFactor, glm::vec4 negativeMeshPosition, btConvexHullShape* negativeConvexHullShape, float positiveWeightFactor, glm::vec4 positiveMeshPosition, btConvexHullShape* positiveConvexHullShape)
-	{
+	{		
+		printf("Prima taglio\n");
+		for(int j=0;j<collisionShapes.size();j++)
+		{
+			printf("%d %p\n",j, (void*)collisionShapes[j]);
+		}
 		btCollisionObject* cuttedCollisionObject = dynamicsWorld->getCollisionObjectArray()[i];
-		RemoveRigidBodyAtIndex(i);
-		collisionShapes.push_back(positiveConvexHullShape);
-		collisionShapes.push_back(negativeConvexHullShape);
 		btRigidBody* cuttedRigidBody = btRigidBody::upcast(cuttedCollisionObject);
 		btTransform positiveTransform;
 		btTransform negativeTransform;
-		if (cuttedRigidBody && cuttedRigidBody->getMotionState())
-		{
-			//By doing this we adjust rotation for both sections
-			cuttedRigidBody->getMotionState()->getWorldTransform(positiveTransform);
-			cuttedRigidBody->getMotionState()->getWorldTransform(negativeTransform);
-		}
+		
+		cuttedRigidBody->getMotionState()->getWorldTransform(positiveTransform);
+		cuttedRigidBody->getMotionState()->getWorldTransform(negativeTransform);
+		RemoveRigidBodyAtIndex(i);
+		
 		positiveTransform.setOrigin(btVector3(positiveMeshPosition.x, positiveMeshPosition.y, positiveMeshPosition.z));
 		negativeTransform.setOrigin(btVector3(negativeMeshPosition.x, negativeMeshPosition.y, negativeMeshPosition.z));
 		
@@ -108,6 +101,9 @@ public:
 		btDefaultMotionState* positiveMotionState = new btDefaultMotionState(positiveTransform);
 		btDefaultMotionState* negativeMotionState = new btDefaultMotionState(negativeTransform);
 		
+		positiveConvexHullShape->calculateLocalInertia(positiveMass, localInertia);
+		negativeConvexHullShape->calculateLocalInertia(negativeMass, localInertia);
+		
 		btRigidBody::btRigidBodyConstructionInfo positiveRbInfo(positiveMass, positiveMotionState, positiveConvexHullShape, localInertia);
 		btRigidBody::btRigidBodyConstructionInfo negativeRbInfo(negativeMass, negativeMotionState, negativeConvexHullShape, localInertia);
 		positiveRbInfo.m_angularDamping = negativeRbInfo.m_angularDamping = 0.9f;
@@ -115,21 +111,26 @@ public:
 		btRigidBody* negativeRb = new btRigidBody(negativeRbInfo);
 		positiveRb->applyImpulse(btVector3(cutNormal.x, cutNormal.y, cutNormal.z)*btScalar(CUT_IMPULSE), btVector3(0.f, 0.f, 0.f));
 		negativeRb->applyImpulse(btVector3(-cutNormal.x, -cutNormal.y, -cutNormal.z)*btScalar(CUT_IMPULSE), btVector3(0.f, 0.f, 0.f));
+		collisionShapes.push_back(positiveConvexHullShape);
+		collisionShapes.push_back(negativeConvexHullShape);
 		dynamicsWorld->addRigidBody(positiveRb);
 		dynamicsWorld->addRigidBody(negativeRb);
+		printf("Post taglio\n");
+		for(int j=0;j<collisionShapes.size();j++)
+		{
+			printf("%d %p\n",j, (void*)collisionShapes[j]);
+		}
 	}
 	
 	void AddRigidBodyWithImpulse(Mesh mesh)
 	{
-		btConvexHullShape* base=new btConvexHullShape();
+		btConvexHullShape* shape=new btConvexHullShape();
 		
 		for(unsigned int i=0; i<mesh.vertices.size();i++)
 		{
 			Vertex vertex = mesh.vertices[i];
-			base->addPoint(btVector3(vertex.Position.x, vertex.Position.y, vertex.Position.z));
+			shape->addPoint(btVector3(vertex.Position.x, vertex.Position.y, vertex.Position.z));
 		}
-		btConvex2dShape* shape=new btConvex2dShape(base);
-		collisionShapes.push_back(shape);
 		btTransform startTransform;
 		startTransform.setIdentity();
 		btScalar mass(1.f);
@@ -143,6 +144,7 @@ public:
 		rbInfo.m_angularDamping =0.90f;
         // we create the rigid body
 		btRigidBody* body = new btRigidBody(rbInfo);
+		collisionShapes.push_back(shape);
 		dynamicsWorld->addRigidBody(body);
 		btScalar xImpulse = ((rand()%101)/101.f)*X_IMPULSE_BOUNDARY * ((rand()%2)>0) ? 1 : -1;
 		btScalar yImpulse = Y_IMPULSE_BOUNDARY;
@@ -154,12 +156,10 @@ public:
 		btCollisionObject* collisionObject = dynamicsWorld->getCollisionObjectArray()[i];
 		dynamicsWorld->removeCollisionObject(collisionObject);
 		delete collisionObject;
-		printf("Coll. objects: %d.\n", dynamicsWorld->getCollisionObjectArray().size());
 		
 		btCollisionShape* shape=collisionShapes[i];
-		collisionShapes.removeAtIndex(i);
+		collisionShapes.remove(shape);
 		delete shape;
-		printf("Coll. shapes: %d.\n", collisionShapes.size());
 	}
 	
 	int GetCollisionShapeIndex(const btCollisionShape* collisionShape)

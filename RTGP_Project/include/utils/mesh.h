@@ -56,7 +56,23 @@ struct Vertex {
 		float deltaX=fabs(Position.x-otherPosition.x);
 		float deltaY=fabs(Position.y-otherPosition.y);
 		float deltaZ=fabs(Position.z-otherPosition.z);
-		return (deltaX<=epsilon) && (deltaY<=epsilon) && (deltaZ<=epsilon);
+		float deltaXNormal=fabs(Normal.x-other.Normal.x);
+		float deltaYNormal=fabs(Normal.y-other.Normal.y);
+		float deltaZNormal=fabs(Normal.z-other.Normal.z);
+		float deltaU=fabs(TexCoords.x-other.TexCoords.x);
+		float deltaV=fabs(TexCoords.y-other.TexCoords.y);
+		float deltaXTangent=fabs(Tangent.x-other.Tangent.x);
+		float deltaYTangent=fabs(Tangent.y-other.Tangent.y);
+		float deltaZTangent=fabs(Tangent.z-other.Tangent.z);
+		float deltaXBitangent=fabs(Bitangent.x-other.Bitangent.x);
+		float deltaYBitangent=fabs(Bitangent.y-other.Bitangent.y);
+		float deltaZBitangent=fabs(Bitangent.z-other.Bitangent.z);
+		
+		return (deltaX<=epsilon) && (deltaY<=epsilon) && (deltaZ<=epsilon) && 
+				(deltaXNormal<=epsilon) && (deltaYNormal<=epsilon) && (deltaZNormal<=epsilon) &&
+				(deltaU<=epsilon) && (deltaV<=epsilon) &&
+				(deltaXTangent<=epsilon) && (deltaYTangent<=epsilon) && (deltaZTangent<=epsilon) &&
+				(deltaXBitangent<=epsilon) && (deltaYBitangent<=epsilon) && (deltaZBitangent<=epsilon);
 	}
 };
 
@@ -329,7 +345,7 @@ public:
 		triangleCentroids.push_back(triangleCentroid);
 	}
 	
-	Mesh Cut(glm::vec4 & positiveMeshPosition, glm::vec4 & negativeMeshPosition, glm::vec4 cutStartPoint, glm::vec4 cutEndPoint, glm::mat4 model ,glm::mat4 view, glm::mat4 projection, btConvexHullShape* & positiveConvexHullShape, btConvexHullShape* & negativeConvexHullShape, float & positiveWeightFactor, float & negativeWeightFactor)
+	void Cut(Mesh & positiveMesh, Mesh & negativeMesh, glm::vec4 & positiveMeshPosition, glm::vec4 & negativeMeshPosition, glm::vec4 cutStartPoint, glm::vec4 cutEndPoint, glm::mat4 model ,glm::mat4 view, glm::mat4 projection, btConvexHullShape* & positiveConvexHullShape, btConvexHullShape* & negativeConvexHullShape, float & positiveWeightFactor, float & negativeWeightFactor)
 	{
 		//Convert world vertices to object space
 		glm::mat4 invModel=glm::inverse(model);
@@ -413,17 +429,15 @@ public:
 			negativeMeshVertices[i].Position.z-=negativeMeshCentroid.z;
 			negativeConvexHullShape->addPoint(btVector3(negativeMeshVertices[i].Position.x, negativeMeshVertices[i].Position.y, negativeMeshVertices[i].Position.z));
 		}
-	
-		vertices=positiveMeshVertices;
-		indices=positiveMeshIndices;
-		setupMesh();
+		
+		positiveMesh=Mesh(positiveMeshVertices, positiveMeshIndices, textures);
+		negativeMesh=Mesh(negativeMeshVertices, negativeMeshIndices, textures);
 		
 		positiveWeightFactor=positiveMeshArea/(positiveMeshArea+negativeMeshArea);
 		negativeWeightFactor=1-positiveWeightFactor;
 		
 		positiveMeshPosition=model*positiveMeshCentroid;
 		negativeMeshPosition=model*negativeMeshCentroid;
-		return Mesh(negativeMeshVertices, negativeMeshIndices, textures);
 	}
 	
 	float PositiveOrNegativeSide(int i, glm::vec4 planeNormal, glm::vec4 planePoint)

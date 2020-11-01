@@ -154,23 +154,30 @@ public:
 				btConvexHullShape* negativeConvexHullShape;
 				glm::vec4 positiveMeshPositionWS;
 				glm::vec4 negativeMeshPositionWS;
+				Mesh positiveMesh;
 				Mesh negativeMesh;
 				float positiveWeightFactor;
 				float negativeWeightFactor;
-				negativeMesh=cuttableMeshes[meshIndex].Cut(positiveMeshPositionWS, 
-															negativeMeshPositionWS, 
-															cutStartPointWS, 
-															cutEndPointWS, 
-															model, 
-															view, 
-															projection, 
-															positiveConvexHullShape, 
-															negativeConvexHullShape, 
-															positiveWeightFactor, 
-															negativeWeightFactor);
+				cuttableMeshes[meshIndex].Cut(positiveMesh,
+											  negativeMesh,
+											  positiveMeshPositionWS, 
+											  negativeMeshPositionWS, 
+											  cutStartPointWS, 
+											  cutEndPointWS, 
+											  model, 
+											  view, 
+											  projection, 
+											  positiveConvexHullShape, 
+											  negativeConvexHullShape, 
+											  positiveWeightFactor, 
+											  negativeWeightFactor);
+				
 				glm::vec3 cutNormal=glm::vec3(-1*(cutEndPointWS.y-cutStartPointWS.y), cutEndPointWS.x-cutStartPointWS.x, 0.0f);
 				engine.CutShapeWithImpulse(cutNormal, meshIndex, model, negativeWeightFactor, negativeMeshPositionWS, negativeConvexHullShape, positiveWeightFactor, positiveMeshPositionWS, positiveConvexHullShape);
-				cuttableMeshes.push_back(negativeMesh);
+				cuttableMeshes.push_back(positiveMesh);
+				cuttableMeshes.push_back(negativeMesh);	
+				cuttableMeshes[meshIndex].Delete();
+				cuttableMeshes.erase(cuttableMeshes.begin()+meshIndex);
 			}
 		}
 	}
@@ -272,18 +279,22 @@ public:
 	
 			if(transform.getOrigin().getY()<=Y_KILL)
 			{
+				cuttableMeshes[i].Delete();
+				iter_swap(cuttableMeshes.begin()+i, cuttableMeshes.end()-1);
+				cuttableMeshes.pop_back();
 				engine.RemoveRigidBodyAtIndex(i);
-				RemoveMeshAtIndex(i);
 			}
 		}
 	}
 	
-	void RemoveMeshAtIndex(unsigned int i)
+	void RemoveAllMeshAndColliders()
 	{
-		if(i>cuttableMeshes.size())
-			return;
-		cuttableMeshes[i].Delete();
-		cuttableMeshes.erase(cuttableMeshes.begin()+i);
+		for(int i=cuttableMeshes.size()-1; 0<=i;i--)
+		{
+			cuttableMeshes[i].Delete();
+			cuttableMeshes.erase(cuttableMeshes.begin()+i);
+			engine.RemoveRigidBodyAtIndex(i);
+		}
 	}
 	
 	void Clear()

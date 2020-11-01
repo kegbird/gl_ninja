@@ -5,49 +5,51 @@
   <TabInfoArray Name="TabInfoArray">
     <TabInfo>
       <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include\utils\scene.h" Name="FileName"/>
-      <int Value="15" Name="FirstVisibleLine"/>
-      <int Value="16" Name="CurrentLine"/>
+      <int Value="6" Name="FirstVisibleLine"/>
+      <int Value="24" Name="CurrentLine"/>
       <wxArrayString Name="Bookmarks"/>
       <IntVector Name="CollapsedFolds"/>
     </TabInfo>
     <TabInfo>
       <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include\utils\mesh.h" Name="FileName"/>
-      <int Value="422" Name="FirstVisibleLine"/>
-      <int Value="423" Name="CurrentLine"/>
+      <int Value="9" Name="FirstVisibleLine"/>
+      <int Value="603" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+      <IntVector Name="CollapsedFolds"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include\utils\model.h" Name="FileName"/>
+      <int Value="69" Name="FirstVisibleLine"/>
+      <int Value="78" Name="CurrentLine"/>
       <wxArrayString Name="Bookmarks"/>
       <IntVector Name="CollapsedFolds"/>
     </TabInfo>
     <TabInfo>
       <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\GL_Ninja\main.cpp" Name="FileName"/>
-      <int Value="170" Name="FirstVisibleLine"/>
-      <int Value="171" Name="CurrentLine"/>
-      <wxArrayString Name="Bookmarks"/>
-      <IntVector Name="CollapsedFolds"/>
-    </TabInfo>
-    <TabInfo>
-      <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include\utils\physics.h" Name="FileName"/>
-      <int Value="123" Name="FirstVisibleLine"/>
-      <int Value="115" Name="CurrentLine"/>
-      <wxArrayString Name="Bookmarks"/>
-      <IntVector Name="CollapsedFolds"/>
-    </TabInfo>
-    <TabInfo>
-      <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include\bullet\BulletCollision\CollisionDispatch\btCollisionObject.h" Name="FileName"/>
-      <int Value="365" Name="FirstVisibleLine"/>
-      <int Value="366" Name="CurrentLine"/>
-      <wxArrayString Name="Bookmarks"/>
-      <IntVector Name="CollapsedFolds"/>
-    </TabInfo>
-    <TabInfo>
-      <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include\bullet\BulletDynamics\Dynamics\btRigidBody.h" Name="FileName"/>
-      <int Value="198" Name="FirstVisibleLine"/>
-      <int Value="210" Name="CurrentLine"/>
+      <int Value="177" Name="FirstVisibleLine"/>
+      <int Value="189" Name="CurrentLine"/>
       <wxArrayString Name="Bookmarks"/>
       <IntVector Name="CollapsedFolds"/>
     </TabInfo>
   </TabInfoArray>
   <SerializedObject Name="m_breakpoints">
-    <long Value="0" Name="Count"/>
+    <long Value="1" Name="Count"/>
+    <SerializedObject Name="Breakpoint0">
+      <wxString Value="D:\Home\Documenti\Repos\GL_Ninja\RTGP_Project\include\utils\model.h" Name="file"/>
+      <int Value="81" Name="lineno"/>
+      <wxString Value="" Name="function_name"/>
+      <wxString Value="" Name="memory_address"/>
+      <int Value="1" Name="bp_type"/>
+      <int Value="0" Name="watchpoint_type"/>
+      <wxString Value="" Name="watchpt_data"/>
+      <CData Name="commandlist"/>
+      <bool Value="0" Name="regex"/>
+      <bool Value="0" Name="is_temp"/>
+      <bool Value="1" Name="is_enabled"/>
+      <int Value="0" Name="ignore_number"/>
+      <wxString Value="" Name="conditions"/>
+      <int Value="0" Name="origin"/>
+    </SerializedObject>
   </SerializedObject>
   <wxString Value="*.c;*.cpp;*.cxx;*.cc;*.h;*.hpp;*.inc;*.mm;*.m;*.xrc;*.plist;*.txt" Name="m_findInFilesMask"/>
 </Session>

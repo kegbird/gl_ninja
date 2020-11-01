@@ -65,7 +65,7 @@ positive Z axis points "outside" the screen
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#define N_MODELS 3
+#define N_MODELS 4
 
 GLuint screenWidth = 1280, screenHeight = 720;
 
@@ -77,6 +77,7 @@ GLint loadTexture(const char* path);
 
 bool keys[1024];
 
+bool stop=false;
 bool pressing = false;
 bool cut=false;
 const GLfloat maxSecPerFrame = 1.0f / 60.0f;
@@ -133,7 +134,7 @@ int main()
 	// Projection matrix: FOV angle, aspect ratio, near and far planes
 	glm::mat4 projection = glm::perspective(45.0f, (float)screenWidth/(float)screenHeight, 0.1f, 15.0f);
 	glm::mat4 view = glm::lookAt(glm::vec3(0.f, 0.f, 7.f), glm::vec3(0.f, 0.f, 6.f), glm::vec3(0.f, 1.f, 0.f));
-	array<string, N_MODELS> modelPaths={"../../models/square.obj","../../models/circle.obj","../../models/triangle.obj"};
+	array<string, N_MODELS> modelPaths={"../../models/cube.obj","../../models/circle.obj","../../models/triangle.obj", "../../models/sphere.obj"};
 	int modelIndex=0;
 	
 	Scene scene=Scene(projection, view);
@@ -166,7 +167,9 @@ int main()
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
 		
-		scene.SimulationStep();
+		if(!stop)
+			scene.SimulationStep();
+			
 		if(scene.AllMeshRemoved())
 		{
 			scene.AddMesh(modelIndex, modelPaths[modelIndex]);
@@ -211,6 +214,9 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     // if L is pressed, we activate/deactivate wireframe rendering of models
     if(key == GLFW_KEY_L && action == GLFW_PRESS)
         wireframe=!wireframe;
+	
+	if(key == GLFW_KEY_SPACE && action == GLFW_PRESS)
+		stop=!stop;
 		
     if(action == GLFW_PRESS)
         keys[key] = true;
