@@ -1,18 +1,3 @@
-/*
-Physics class - v1:
-- initialization of the physics simulation using the Bullet librarty
-
-The class sets up the collision manager and the resolver of the constraints, using basic general-purposes methods provided by the library. Advanced and multithread methods are available, please consult Bullet documentation and examples
-
-createRigidBody method sets up a  Box or Sphere Collision Shape. For other Shapes, you must extend the method.
-
-author: Davide Gadia
-
-Real-Time Graphics Programming - a.a. 2018/2019
-Master degree in ComputclTabCtrler Science
-Universita' degli Studi di Milano
-*/
-
 #pragma once
 #define GRAVITY -9.82f
 #define CUT_IMPULSE 0.25f
@@ -70,26 +55,37 @@ public:
 		btCollisionObject* collisionObject = dynamicsWorld->getCollisionObjectArray()[i];
 		btRigidBody* rigidBody = btRigidBody::upcast(collisionObject);
 		btTransform transform;
-		transform = collisionObject->getWorldTransform();
+		if (rigidBody && rigidBody->getMotionState())
+		{
+			rigidBody->getMotionState()->getWorldTransform(transform);
+		}
+		else
+		{
+			transform = collisionObject->getWorldTransform();
+		}
 		float glmTransform[16];
 		transform.getOpenGLMatrix(glmTransform);
 		return glm::make_mat4(glmTransform);
 	}
 	
-	void CutShapeWithImpulse(glm::vec3 cutNormal, int i, glm::mat4 model, float negativeWeightFactor, glm::vec4 negativeMeshPosition, btConvexHullShape* negativeConvexHullShape, float positiveWeightFactor, glm::vec4 positiveMeshPosition, btConvexHullShape* positiveConvexHullShape)
+	void CutShapeWithImpulse(glm::vec3 cutNormal, int i, float negativeWeightFactor, glm::vec4 negativeMeshPosition, btConvexHullShape* negativeConvexHullShape, float positiveWeightFactor, glm::vec4 positiveMeshPosition, btConvexHullShape* positiveConvexHullShape)
 	{		
-		printf("Prima taglio\n");
-		for(int j=0;j<collisionShapes.size();j++)
-		{
-			printf("%d %p\n",j, (void*)collisionShapes[j]);
-		}
 		btCollisionObject* cuttedCollisionObject = dynamicsWorld->getCollisionObjectArray()[i];
 		btRigidBody* cuttedRigidBody = btRigidBody::upcast(cuttedCollisionObject);
 		btTransform positiveTransform;
 		btTransform negativeTransform;
 		
-		cuttedRigidBody->getMotionState()->getWorldTransform(positiveTransform);
-		cuttedRigidBody->getMotionState()->getWorldTransform(negativeTransform);
+		if (cuttedRigidBody && cuttedRigidBody->getMotionState())
+		{
+			cuttedRigidBody->getMotionState()->getWorldTransform(positiveTransform);
+			cuttedRigidBody->getMotionState()->getWorldTransform(negativeTransform);
+		}
+		else
+		{
+			positiveTransform = cuttedCollisionObject->getWorldTransform();
+			negativeTransform = cuttedCollisionObject->getWorldTransform();
+		}
+		
 		RemoveRigidBodyAtIndex(i);
 		
 		positiveTransform.setOrigin(btVector3(positiveMeshPosition.x, positiveMeshPosition.y, positiveMeshPosition.z));
@@ -101,25 +97,20 @@ public:
 		btDefaultMotionState* positiveMotionState = new btDefaultMotionState(positiveTransform);
 		btDefaultMotionState* negativeMotionState = new btDefaultMotionState(negativeTransform);
 		
-		positiveConvexHullShape->calculateLocalInertia(positiveMass, localInertia);
-		negativeConvexHullShape->calculateLocalInertia(negativeMass, localInertia);
+		positiveConvexHullShape->calculateLocalInertia(positiveWeightFactor, localInertia);
+		negativeConvexHullShape->calculateLocalInertia(negativeWeightFactor, localInertia);
 		
 		btRigidBody::btRigidBodyConstructionInfo positiveRbInfo(positiveMass, positiveMotionState, positiveConvexHullShape, localInertia);
 		btRigidBody::btRigidBodyConstructionInfo negativeRbInfo(negativeMass, negativeMotionState, negativeConvexHullShape, localInertia);
 		positiveRbInfo.m_angularDamping = negativeRbInfo.m_angularDamping = 0.9f;
 		btRigidBody* positiveRb = new btRigidBody(positiveRbInfo);
 		btRigidBody* negativeRb = new btRigidBody(negativeRbInfo);
-		positiveRb->applyImpulse(btVector3(cutNormal.x, cutNormal.y, cutNormal.z)*btScalar(CUT_IMPULSE), btVector3(0.f, 0.f, 0.f));
-		negativeRb->applyImpulse(btVector3(-cutNormal.x, -cutNormal.y, -cutNormal.z)*btScalar(CUT_IMPULSE), btVector3(0.f, 0.f, 0.f));
+		positiveRb->applyImpulse(btVector3(cutNormal.x, cutNormal.y, cutNormal.z)*btScalar(CUT_IMPULSE), btVector3(0.5f, 0.5f, 0));
+		negativeRb->applyImpulse(btVector3(-cutNormal.x, -cutNormal.y, -cutNormal.z)*btScalar(CUT_IMPULSE), btVector3(0.5f, 0.5f, 0));
 		collisionShapes.push_back(positiveConvexHullShape);
 		collisionShapes.push_back(negativeConvexHullShape);
 		dynamicsWorld->addRigidBody(positiveRb);
 		dynamicsWorld->addRigidBody(negativeRb);
-		printf("Post taglio\n");
-		for(int j=0;j<collisionShapes.size();j++)
-		{
-			printf("%d %p\n",j, (void*)collisionShapes[j]);
-		}
 	}
 	
 	void AddRigidBodyWithImpulse(Mesh mesh)
@@ -156,7 +147,6 @@ public:
 		btCollisionObject* collisionObject = dynamicsWorld->getCollisionObjectArray()[i];
 		dynamicsWorld->removeCollisionObject(collisionObject);
 		delete collisionObject;
-		
 		btCollisionShape* shape=collisionShapes[i];
 		collisionShapes.remove(shape);
 		delete shape;

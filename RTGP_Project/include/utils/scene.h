@@ -32,8 +32,11 @@ class Scene
 private:
 	Physics engine;
 	Shader planeShader;
+	Shader objectShader;
 	Mesh planeMesh;
 	GLint planeTexture;
+	GLfloat planeDiffuseColor[3]={1.0f, 1.0f, 1.0f};
+	GLint objectTexture;
 	vector<Mesh> cuttableMeshes;
 	GLfloat deltaTime;
 	const GLfloat maxSecPerFrame=1.0f / 60.0f;
@@ -46,18 +49,15 @@ private:
 	GLfloat quadratic = 0.001f;
 	GLfloat alpha = 0.2f;
 	GLfloat F0 = 0.9f;
-	vector<GLint> textureID;
 	GLfloat repeat = 80.0;
 	glm::mat4 projection;
 	glm::mat4 view;
 	GLfloat currentFrame;
 	GLfloat lastFrame;
-	Shader meshShader;
-	GLfloat meshDiffuseColor[3]={0.0f, 0.0f, 0.0f};
-	glm::vec3 lightPositions[3] = {glm::vec3(5.0f, 10.0f, 10.0f), glm::vec3(-5.0f, 10.0f, 10.0f), glm::vec3(5.0f, 10.0f, -10.0f)};		
 	GLfloat specularColor[3] = {1.0,1.0,1.0};
 	GLfloat ambientColor[3] = {0.1,0.1,0.1};
-	GLfloat diffuseColor[3] = {1.0f,0.0f,0.0f};
+	glm::vec3 lightPositions[3] = {glm::vec3(5.0f, 10.0f, 10.0f), glm::vec3(-5.0f, 10.0f, 10.0f), glm::vec3(5.0f, 10.0f, -10.0f)};		
+	GLfloat objectDiffuseColor[3] = {1.0f,1.0f,1.0f};
 	float cutDepthNDC=0.0f;
 
 public:
@@ -71,7 +71,7 @@ public:
 		lastFrame=0.0f;
 		this->projection=projection;
 		this->view=view;
-		meshShader=Shader("lambert.vert", "lambert.frag");
+		objectShader=Shader("lambert.vert", "lambert.frag");
 		planeShader=Shader("18_phong_tex_multiplelights.vert", "19a_blinnphong_tex_multiplelights.frag");
 		planeTexture=LoadTexture("../../textures/SoilCracked.png");
 		
@@ -91,10 +91,7 @@ public:
 			std::cout << "Failed to load texture!" << std::endl;
 		glGenTextures(1, &textureImage);
 		glBindTexture(GL_TEXTURE_2D, textureImage);
-		if (channels==3)
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
-		else if (channels==4)
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
 		glGenerateMipmap(GL_TEXTURE_2D);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -109,9 +106,9 @@ public:
 		GLfloat red=(GLfloat)((GLfloat)(rand()%COLOR_LIMIT)/(GLfloat)COLOR_LIMIT);
 		GLfloat green=(GLfloat)((GLfloat)(rand()%COLOR_LIMIT)/(GLfloat)COLOR_LIMIT);
 		GLfloat blue=(GLfloat)((GLfloat)(rand()%COLOR_LIMIT)/(GLfloat)COLOR_LIMIT);
-		meshDiffuseColor[0]=red;
-		meshDiffuseColor[1]=green;
-		meshDiffuseColor[2]=blue;
+		objectDiffuseColor[0]=red;
+		objectDiffuseColor[1]=green;
+		objectDiffuseColor[2]=blue;
 		Model* object = new Model(meshPath);
 		std::vector<Mesh>::iterator cuttableMeshesIt=cuttableMeshes.begin();
 		cuttableMeshes.insert(cuttableMeshesIt, object->meshes.begin(), object->meshes.end());
@@ -146,10 +143,7 @@ public:
 				int meshIndex=engine.GetCollisionShapeIndex(collisionShape);
 				if(meshIndex<0)
 					continue;
-					
-				printf("La mesh tagliata: %d.\n",meshIndex);
 				glm::mat4 model=engine.GetObjectModelMatrix(meshIndex);
-				
 				btConvexHullShape* positiveConvexHullShape;
 				btConvexHullShape* negativeConvexHullShape;
 				glm::vec4 positiveMeshPositionWS;
@@ -173,7 +167,7 @@ public:
 											  negativeWeightFactor);
 				
 				glm::vec3 cutNormal=glm::vec3(-1*(cutEndPointWS.y-cutStartPointWS.y), cutEndPointWS.x-cutStartPointWS.x, 0.0f);
-				engine.CutShapeWithImpulse(cutNormal, meshIndex, model, negativeWeightFactor, negativeMeshPositionWS, negativeConvexHullShape, positiveWeightFactor, positiveMeshPositionWS, positiveConvexHullShape);
+				engine.CutShapeWithImpulse(cutNormal, meshIndex, negativeWeightFactor, negativeMeshPositionWS, negativeConvexHullShape, positiveWeightFactor, positiveMeshPositionWS, positiveConvexHullShape);
 				cuttableMeshes.push_back(positiveMesh);
 				cuttableMeshes.push_back(negativeMesh);	
 				cuttableMeshes[meshIndex].Delete();
@@ -208,7 +202,7 @@ public:
             glUniform3fv(glGetUniformLocation(planeShader.Program, ("lights[" + number + "]").c_str()), 1, glm::value_ptr(lightPositions[i]));
         }
         glUniform1f(kdLocation, Kd);
-        glUniform1i(textureLocation, 1);
+        glUniform1i(textureLocation, planeTexture);
         glUniform1f(repeatLocation, repeat);
         glUniform3fv(matAmbientLocation, 1, ambientColor);
         glUniform3fv(matSpecularLocation, 1, specularColor);
@@ -232,23 +226,23 @@ public:
 		std::vector<Mesh>::iterator cuttableMeshesIt;
 		for (cuttableMeshesIt = cuttableMeshes.begin(); cuttableMeshesIt != cuttableMeshes.end(); ++cuttableMeshesIt)
 		{
-			meshShader.Use();
-			glUniformMatrix4fv(glGetUniformLocation(meshShader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
-			glUniformMatrix4fv(glGetUniformLocation(meshShader.Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
+			objectShader.Use();
+			glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
+			glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
 			// we determine the position in the Shader Program of the uniform variables
-			GLint pointLightLocation = glGetUniformLocation(meshShader.Program, "pointLightPosition");
-			GLint objectDiffuseLocation = glGetUniformLocation(meshShader.Program, "diffuseColor");
-			GLint kdObjectLocation = glGetUniformLocation(meshShader.Program, "Kd");
+			GLint pointLightLocation = glGetUniformLocation(objectShader.Program, "pointLightPosition");
+			GLint objectDiffuseLocation = glGetUniformLocation(objectShader.Program, "diffuseColor");
+			GLint kdObjectLocation = glGetUniformLocation(objectShader.Program, "Kd");
 			// we assign the value to the uniform variables
 			glUniform3fv(pointLightLocation, 1, glm::value_ptr(lightPositions[0]));
-			glUniform3fv(objectDiffuseLocation, 1, meshDiffuseColor);
+			glUniform3fv(objectDiffuseLocation, 1, objectDiffuseColor);
 			glUniform1f(kdObjectLocation, Kd);
 			glm::mat4 objectModelMatrix=engine.GetObjectModelMatrix(i);
 			glm::mat3 objectNormalMatrix;
 			objectNormalMatrix = glm::inverseTranspose(glm::mat3(view*objectModelMatrix));
-			glUniformMatrix4fv(glGetUniformLocation(meshShader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(objectModelMatrix));
-			glUniformMatrix3fv(glGetUniformLocation(meshShader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(objectNormalMatrix));
-			cuttableMeshesIt->Draw(meshShader);
+			glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "modelMatrix"), 1, GL_FALSE, glm::value_ptr(objectModelMatrix));
+			glUniformMatrix3fv(glGetUniformLocation(objectShader.Program, "normalMatrix"), 1, GL_FALSE, glm::value_ptr(objectNormalMatrix));
+			cuttableMeshesIt->Draw(objectShader);
 			i++;
 		}
 	}
@@ -300,8 +294,7 @@ public:
 	void Clear()
 	{
 		engine.Clear();
-		planeShader.Delete();
-		meshShader.Delete();
+		objectShader.Delete();
 		planeMesh.Delete();
 		std::vector<Mesh>::iterator cuttableMeshesIt;
 		for (cuttableMeshesIt = cuttableMeshes.begin(); cuttableMeshesIt != cuttableMeshes.end(); ++cuttableMeshesIt)

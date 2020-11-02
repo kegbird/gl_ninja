@@ -14,11 +14,11 @@ Universita' degli Studi di Milano
 // output shader variable
 out vec4 colorFrag;
 
+uniform vec3 ambientColor;
 // diffusive component (passed from the application)
 uniform vec3 diffuseColor;
 // weight of the diffusive component
 uniform float Kd;
-
 // vettore di incidenza della luce (calcolato nel vertes shader)
 // light incidence direction (calculated in vertex shader, interpolated by rasterization)
 in vec3 lightDir;

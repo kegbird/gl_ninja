@@ -65,7 +65,7 @@ positive Z axis points "outside" the screen
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#define N_MODELS 4
+#define N_MODELS 7
 
 GLuint screenWidth = 1280, screenHeight = 720;
 
@@ -73,6 +73,7 @@ void drawIndicatorLine(Shader lineShader);
 void calculateCutNDCCoordinates(int i);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
+void display_framerate(float framerate);
 GLint loadTexture(const char* path);
 
 bool keys[1024];
@@ -134,15 +135,15 @@ int main()
 	// Projection matrix: FOV angle, aspect ratio, near and far planes
 	glm::mat4 projection = glm::perspective(45.0f, (float)screenWidth/(float)screenHeight, 0.1f, 15.0f);
 	glm::mat4 view = glm::lookAt(glm::vec3(0.f, 0.f, 7.f), glm::vec3(0.f, 0.f, 6.f), glm::vec3(0.f, 1.f, 0.f));
-	array<string, N_MODELS> modelPaths={"../../models/cube.obj","../../models/circle.obj","../../models/triangle.obj", "../../models/sphere.obj"};
+	array<string, N_MODELS> modelPaths={"../../models/cube.obj","../../models/circle.obj","../../models/icosphere.obj","../../models/cylinder.obj","../../models/cone.obj","../../models/triangle.obj", "../../models/sphere.obj"};
 	int modelIndex=0;
 	
 	Scene scene=Scene(projection, view);
 	
+	double startTime = glfwGetTime();
 	GLfloat deltaTime;
-	GLfloat currentFrame;
+	double currentTime;
 	GLfloat lastFrame;
-	
 	glGenVertexArrays(1, &VAOCut);
 	glGenBuffers(1, &VBOCut);
 	glBindVertexArray(VAOCut);
@@ -152,6 +153,9 @@ int main()
 	glEnableVertexAttribArray(0);  
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
+	
+    string fpsStr="";
+	int numFrames=0;
 	
     while(!glfwWindowShouldClose(window))
     {
@@ -163,9 +167,20 @@ int main()
         else
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 			
-		currentFrame = glfwGetTime();
-		deltaTime = currentFrame - lastFrame;
-		lastFrame = currentFrame;
+		currentTime = glfwGetTime();
+		deltaTime = currentTime - lastFrame;
+		lastFrame = currentTime;
+		
+		numFrames++;
+		if(currentTime - startTime>=1)
+		{
+			fpsStr="Fps: "+std::to_string(numFrames);
+			cout<<fpsStr;
+			cout << string(fpsStr.length(),'\b');
+			numFrames=0;
+			startTime=glfwGetTime();
+		}
+		
 		
 		if(!stop)
 			scene.SimulationStep();
@@ -203,6 +218,11 @@ int main()
 	lineShader.Delete();
     glfwTerminate();
     return 0;
+}
+
+void display_framerate(float framerate)
+{
+	
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)

@@ -56,7 +56,7 @@ uniform float repeat;
 // texture sampler
 uniform sampler2D tex;
 
-// ambient, and specular components (passed from the application)
+// ambient, and specular components (passed from the application
 uniform vec3 ambientColor;
 uniform vec3 specularColor;
 // weight of the components
