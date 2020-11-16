@@ -112,7 +112,7 @@ public:
 		Model* object = new Model(meshPath);
 		std::vector<Mesh>::iterator cuttableMeshesIt=cuttableMeshes.begin();
 		cuttableMeshes.insert(cuttableMeshesIt, object->meshes.begin(), object->meshes.end());
-		engine.AddRigidBodyWithImpulse(cuttableMeshes.back());
+		engine.AddRigidBodyWithImpulse(object->shape);
 	}
 	
 	bool AllMeshRemoved()
@@ -130,7 +130,6 @@ public:
 		cutStartPointWS/=cutStartPointWS.w;
 		cutEndPointWS = projViewInv*cutEndPointWS;
 		cutEndPointWS/=cutEndPointWS.w;
-
 		btCollisionWorld::AllHitsRayResultCallback callback(btVector3(cutStartPointWS.x, cutStartPointWS.y, cutStartPointWS.z), btVector3(cutEndPointWS.x, cutEndPointWS.y, cutEndPointWS.z));
 		engine.dynamicsWorld->rayTest(btVector3(cutStartPointWS.x, cutStartPointWS.y, cutStartPointWS.z), btVector3(cutEndPointWS.x, cutEndPointWS.y, cutEndPointWS.z), callback);
 									
@@ -167,15 +166,15 @@ public:
 											  negativeWeightFactor);
 				
 				glm::vec3 cutNormal=glm::vec3(-1*(cutEndPointWS.y-cutStartPointWS.y), cutEndPointWS.x-cutStartPointWS.x, 0.0f);
-				engine.CutShapeWithImpulse(cutNormal, meshIndex, negativeWeightFactor, negativeMeshPositionWS, negativeConvexHullShape, positiveWeightFactor, positiveMeshPositionWS, positiveConvexHullShape);
+				glm::vec3 cutDirection=(cutEndPointWS-cutStartPointWS);
+				cutDirection=glm::normalize(cutDirection);
+				engine.CutShapeWithImpulse(cutNormal, cutDirection, meshIndex, negativeWeightFactor, negativeMeshPositionWS, negativeConvexHullShape, positiveWeightFactor, positiveMeshPositionWS, positiveConvexHullShape);
+				//Delete the old mesh
 				cuttableMeshes[meshIndex].Delete();
 				iter_swap(cuttableMeshes.begin()+meshIndex, cuttableMeshes.end()-1);
 				cuttableMeshes.pop_back();
-				
 				cuttableMeshes.push_back(positiveMesh);
 				cuttableMeshes.push_back(negativeMesh);	
-				/*cuttableMeshes[meshIndex].Delete();
-				cuttableMeshes.erase(cuttableMeshes.begin()+meshIndex);*/
 			}
 		}
 	}
@@ -271,9 +270,6 @@ public:
 			{
 				transform = collisionObject->getWorldTransform();
 			}
-			
-			float glmTransform[16];
-			transform.getOpenGLMatrix(glmTransform);
 	
 			if(transform.getOrigin().getY()<=Y_KILL)
 			{

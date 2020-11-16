@@ -22,6 +22,7 @@ using namespace std;
 #include <iostream>
 #include <map>
 #include <vector>
+#include <utils/log.h>
 
 // GL Includes
 #include <glad/glad.h> // Contains all the necessery OpenGL includes
@@ -53,6 +54,8 @@ public:
     vector<Mesh> meshes;
     // the folder on disk of the model (needed for the loading of textures, if model is provided of textures)
     string directory;
+	//physical shape
+	btConvexHullShape* shape;
 
     //////////////////////////////////////////
 	Model(){}
@@ -140,63 +143,47 @@ private:
     // In this case, we pass also aiScene instance, because we need to set the materials once loaded the textures 
     Mesh processMesh(aiMesh* mesh, const aiScene* scene)
     {
-      // data structures for vertices and indices of vertices (for faces)
-        vector<Vertex> vertices;
+		Log log=Log();
+		log.InitLog("processMesh");
+		Vertex vertices_array[mesh->mNumVertices];
+		vector<Vertex> vertices;
         vector<GLuint> indices;
-        // vector with all the model textures
         vector<Texture> textures;
-
-        for(GLuint i = 0; i < mesh->mNumVertices; i++)
-        {
-            Vertex vertex;
-            // the vector data type used by Assimp is different than the GLM vector needed to allocate the OpenGL buffers
-            // I need to convert the data structures (from Assimp to GLM, which are fully compatible to the OpenGL)
-            glm::vec3 vector;
-            // vertices coordinates
-            vector.x = mesh->mVertices[i].x;
-            vector.y = mesh->mVertices[i].y;
-            vector.z = mesh->mVertices[i].z;
-            vertex.Position = vector;
-            // Normals
-            vector.x = mesh->mNormals[i].x;
-            vector.y = mesh->mNormals[i].y;
-            vector.z = mesh->mNormals[i].z;
-            vertex.Normal = vector;
-            // Texture Coordinates
-            // if the model has texture coordinates, than we assign them to a GLM data structure, otherwise we set them at 0
-            // if texture coordinates are present, than Assimp can calculate tangents and bitangents, otherwise we set them at 0 too
-            if(mesh->mTextureCoords[0])
-            {
-                glm::vec2 vec;
-                // in this example we assume the model has only one set of texture coordinates. Actually, a vertex can have ip to 8 different texture coordinates. For other models and formats, this code needs to be adapted and modified.
-                vec.x = mesh->mTextureCoords[0][i].x;
-                vec.y = mesh->mTextureCoords[0][i].y;
-                vertex.TexCoords = vec;
-				// Tangents
-				vector.x = mesh->mTangents[i].x;
-				vector.y = mesh->mTangents[i].y;
-				vector.z = mesh->mTangents[i].z;
-				vertex.Tangent = vector;
-				// Bitangents
-				vector.x = mesh->mBitangents[i].x;
-				vector.y = mesh->mBitangents[i].y;
-				vector.z = mesh->mBitangents[i].z;
-				vertex.Bitangent = vector;
-            }
-            else{
-                vertex.TexCoords = glm::vec2(0.0f, 0.0f);
-            }
-			
-            vertices.push_back(vertex);
-        }
+		unordered_map<glm::vec3, bool> pointsAddedMap;
+		shape=new btConvexHullShape();
 
         // for each face of the mesh, we retrieve the indices of its vertices , and we store them in a vector data structure
         for(GLuint i = 0; i < mesh->mNumFaces; i++)
         {
-            aiFace face = mesh->mFaces[i];
-            for(GLuint j = 0; j < face.mNumIndices; j++)
-                indices.push_back(face.mIndices[j]);
-        }
+            aiFace triangle = mesh->mFaces[i];
+            for(GLuint j = 0; j < triangle.mNumIndices; j++)
+			{
+				indices.push_back(triangle.mIndices[j]);
+				Vertex vertex=Vertex();
+				vertex.Position=glm::vec3(mesh->mVertices[triangle.mIndices[j]].x, mesh->mVertices[triangle.mIndices[j]].y, mesh->mVertices[triangle.mIndices[j]].z);
+				vertex.Normal=glm::vec3(mesh->mNormals[triangle.mIndices[j]].x, mesh->mNormals[triangle.mIndices[j]].y, mesh->mNormals[triangle.mIndices[j]].z);
+				if(mesh->mTextureCoords[0])
+				{
+					vertex.TexCoords = glm::vec2(mesh->mTextureCoords[0][triangle.mIndices[j]].x, mesh->mTextureCoords[0][triangle.mIndices[j]].y);
+					vertex.Bitangent=glm::vec3(mesh->mBitangents[triangle.mIndices[j]].x, mesh->mBitangents[triangle.mIndices[j]].y, mesh->mBitangents[triangle.mIndices[j]].z);
+					vertex.Tangent=glm::vec3(mesh->mTangents[triangle.mIndices[j]].x, mesh->mTangents[triangle.mIndices[j]].y, mesh->mTangents[triangle.mIndices[j]].z);
+				}
+				else{
+					vertex.TexCoords = glm::vec2(0.0f, 0.0f);
+				}
+				vertices_array[triangle.mIndices[j]]=vertex;
+				
+				auto it=pointsAddedMap.find(vertex.Position);
+				if(it==pointsAddedMap.end())
+				{
+					shape->addPoint(btVector3(vertex.Position.x, vertex.Position.y, vertex.Position.z));
+					pointsAddedMap[vertex.Position]=true;
+				}
+			}
+		}
+		
+		vertices=std::vector<Vertex>(vertices_array, vertices_array+mesh->mNumVertices);
+		log.EndLog();
 		return Mesh(vertices, indices, textures);
     }
 

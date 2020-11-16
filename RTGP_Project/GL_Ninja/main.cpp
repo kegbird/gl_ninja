@@ -135,7 +135,7 @@ int main()
 	// Projection matrix: FOV angle, aspect ratio, near and far planes
 	glm::mat4 projection = glm::perspective(45.0f, (float)screenWidth/(float)screenHeight, 0.1f, 15.0f);
 	glm::mat4 view = glm::lookAt(glm::vec3(0.f, 0.f, 7.f), glm::vec3(0.f, 0.f, 6.f), glm::vec3(0.f, 1.f, 0.f));
-	array<string, N_MODELS> modelPaths={"../../models/cube.obj","../../models/circle.obj","../../models/icosphere.obj","../../models/cylinder.obj","../../models/cone.obj","../../models/triangle.obj", "../../models/sphere.obj"};
+	array<string, N_MODELS> modelPaths={"../../models/monkey.obj","../../models/circle.obj","../../models/icosphere.obj","../../models/cylinder.obj","../../models/cone.obj","../../models/triangle.obj", "../../models/sphere.obj"};
 	int modelIndex=0;
 	
 	Scene scene=Scene(projection, view);
