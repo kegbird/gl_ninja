@@ -6,4 +6,4 @@ GL_Ninja is a simple "Fruit Ninja" clone developed for the course "Real time Gra
 The application related to this project allows to cut three dimensional convex meshes, performing ritriangulation and
 face filling, all in real time.
 
-Here a little demo of the project.
+[Here](https://www.youtube.com/watch?v=IloNGvg8TZI) a little demo of the project.
