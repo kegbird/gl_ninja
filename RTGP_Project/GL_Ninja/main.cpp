@@ -1,99 +1,46 @@
 /*
-Es04a: as Es03c, but textures are used for the diffusive component of materials
-- swapping (pressing keys from 1 to 2) between a shader with texturing applied to the Blinn-Phong and GGX illumination models
-N.B. 1) The presented shader swapping method is used in OpenGL 3.3 .
-        For OpenGL 4.x, shader subroutines can be used : http://www.geeks3d.com/20140701/opengl-4-shader-subroutines-introduction-3d-programming-tutorial/
-N.B. 2) we have considered point lights only, the code must be modifies in case of lights of different nature
-N.B. 3) there are other methods (more efficient) to pass multiple data to the shaders (search for Uniform Buffer Objects)
-N.B. 4) with last versions of OpenGL, using structures like the one cited above, it is possible to pass a dynamic number of lights
-N.B. 5) Updated versions, including texturing, of Model (model_v2.h) and Mesh (mesh_v2.h) classes are used.
-author: Davide Gadia
-Real-Time Graphics Programming - a.a. 2018/2019
-Master degree in Computer Science
-Universita' degli Studi di Milano
-*/
-
-/*
-OpenGL coordinate system (right-handed)
-positive X axis points right
-positive Y axis points up
-positive Z axis points "outside" the screen
-                              Y
-                              |
-                              |
-                              |________X
-                             /
-                            /
-                           /
-                          Z
+The main function of GL_Ninja in addition to creating the window and managing user's input, it creates and use
+the scene object methods(inside the draw loop).
 */
 
 #ifdef _WIN32
     #define __USE_MINGW_ANSI_STDIO 0
 #endif
-// Std. Includes
 #include <list>
 #include <time.h>
 #include <string>
 #include <cstdlib>
-
 #ifdef _WIN32
     #define APIENTRY __stdcall
 #endif
-
 #include <glad/glad.h>
-
-// GLFW library to create window and to manage I/O
 #include <glfw/glfw3.h>
-
-// another check related to OpenGL loader
-// confirm that GLAD didn't include windows.h
 #ifdef _WINDOWS_
     #error windows.h was included!
 #endif
-
-// classes developed during lab lectures to manage shaders, to load models, and for FPS camera
-// in this example, the Model and Mesh classes support texturing
 #include <utils/shader.h>
 #include <utils/model.h>
 #include <utils/physics.h>
 #include <utils/scene.h>
-
-// we load the GLM classes used in the application
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#define N_MODELS 7
+#define N_MODELS 14
 
 GLuint screenWidth = 1280, screenHeight = 720;
-
 void drawIndicatorLine(Shader lineShader);
 void calculateCutNDCCoordinates(int i);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
-void display_framerate(float framerate);
-GLint loadTexture(const char* path);
-
-bool keys[1024];
-
 bool stop=false;
 bool pressing = false;
 bool cut=false;
-const GLfloat maxSecPerFrame = 1.0f / 60.0f;
-
 GLboolean wireframe = GL_FALSE;
-
-glm::vec3 lightPositions[] = {
-    glm::vec3(5.0f, 10.0f, 10.0f),
-    glm::vec3(-5.0f, 10.0f, 10.0f),
-    glm::vec3(5.0f, 10.0f, -10.0f),
-};
-
 unsigned int VAOCut, VBOCut;
+bool keys[1024];
 glm::vec3 cutVerticesNDC[] = {glm::vec3(0.f, 0.f, 1.f), glm::vec3(0.f, 0.f, 1.f)};
-
 GLFWwindow* window;
 
 int main()
@@ -117,7 +64,6 @@ int main()
     glfwSetKeyCallback(window, key_callback);
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
 
-    // GLAD tries to load the context set by GLFW
     if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress))
     {
         std::cout << "Failed to initialize OpenGL context" << std::endl;
@@ -132,10 +78,23 @@ int main()
 		
 	Shader lineShader("lineShader.vert", "lineShader.frag");
 	
-	// Projection matrix: FOV angle, aspect ratio, near and far planes
 	glm::mat4 projection = glm::perspective(45.0f, (float)screenWidth/(float)screenHeight, 0.1f, 15.0f);
 	glm::mat4 view = glm::lookAt(glm::vec3(0.f, 0.f, 7.f), glm::vec3(0.f, 0.f, 6.f), glm::vec3(0.f, 1.f, 0.f));
-	array<string, N_MODELS> modelPaths={"../../models/monkey.obj","../../models/circle.obj","../../models/icosphere.obj","../../models/cylinder.obj","../../models/cone.obj","../../models/triangle.obj", "../../models/sphere.obj"};
+	//These are the models cyclically loaded in the application.
+	array<string, N_MODELS> modelPaths={"../../models/cube.obj",
+										"../../models/rook.obj",
+										"../../models/pedestal.obj",
+										"../../models/horse.obj",
+										"../../models/icosphere.obj",
+										"../../models/bishop.obj",
+										"../../models/cylinder.obj",
+										"../../models/pawn.obj",
+										"../../models/cone.obj",
+										"../../models/barrel.obj",
+										"../../models/king.obj",
+										"../../models/sphere.obj",
+										"../../models/queen.obj",
+										"../../models/monkey.obj"};
 	int modelIndex=0;
 	
 	Scene scene=Scene(projection, view);
@@ -187,11 +146,12 @@ int main()
 			
 		if(scene.AllMeshRemoved())
 		{
-			scene.AddMesh(modelIndex, modelPaths[modelIndex]);
+			scene.AddMesh(modelPaths[modelIndex]);
 			modelIndex++;
 			modelIndex = modelIndex%N_MODELS;
 		}
 		
+		//By pressing the right mouse button, the line shader draws a line segment between two points in ndc space.
 		if(pressing)
 		{		
 			calculateCutNDCCoordinates(1);
@@ -203,12 +163,12 @@ int main()
 		}
 		else if(cut)
 		{
+			//By releasing the right mouse button, the application tries to perform a cut, passing to the cut method
+			//the cut points that define the cut segment.
 			cut=false;
 			scene.Cut(cutVerticesNDC[0], cutVerticesNDC[1]);
 		}
-		
 		scene.DrawScene();
-		
         glfwSwapBuffers(window);
     }
 	
@@ -220,18 +180,11 @@ int main()
     return 0;
 }
 
-void display_framerate(float framerate)
-{
-	
-}
-
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)
 {
-    // if ESC is pressed, we close the application
     if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
 
-    // if L is pressed, we activate/deactivate wireframe rendering of models
     if(key == GLFW_KEY_L && action == GLFW_PRESS)
         wireframe=!wireframe;
 	
@@ -244,6 +197,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         keys[key] = false;
 }
 
+//The beginning and ending positions of the cut segment are store inside the cutVertices array;
+//the first array slot is the starting point, while the second the ending point.
 void calculateCutNDCCoordinates(int i)
 {
 	double xpos, ypos;
@@ -253,6 +208,7 @@ void calculateCutNDCCoordinates(int i)
 	cutVerticesNDC[i]=glm::vec3(2.0f*(x/screenWidth) - 1.0f, (-1)*2.0f*(y/screenHeight) + 1.0f, 0);
 }
 
+//This callback function handles mouse inputs (right mouse button pressing and release).
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
@@ -260,7 +216,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 		calculateCutNDCCoordinates(0);
 		pressing=true;
 	}
-	else if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE )
+	else if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
 	{
 		pressing=false;
 		cut=true;

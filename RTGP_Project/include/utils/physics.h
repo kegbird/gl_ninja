@@ -1,9 +1,17 @@
+/*
+Physics class:
+
+This class manages the physics simulation of the scene developed for this project.
+Each mesh drawn in the scene is also associated with a convex hull; all these convex hulls are stored inside
+the collisionShapes object.
+*/
+
 #pragma once
 #define GRAVITY -9.82f
 #define CUT_IMPULSE 0.20f
-#define X_BOUNDARY 6
-#define X_IMPULSE_BOUNDARY 2
-#define Y_IMPULSE_BOUNDARY 13
+#define X_BOUNDARY 3.f
+#define X_IMPULSE_BOUNDARY 2.f
+#define Y_IMPULSE_BOUNDARY 13.f
 
 #include <glm/glm.hpp>
 #include <btConvex2dShape.h>
@@ -16,44 +24,29 @@
 #include <utils/log.h>
 #include <bullet/btBulletDynamicsCommon.h>
 
-///////////////////  Physics class ///////////////////////
 class Physics
 {
 public:
 
-    btDiscreteDynamicsWorld* dynamicsWorld; // the main physical simulation class
-    btAlignedObjectArray<btCollisionShape*> collisionShapes; // a vector for all the Collision Shapes of the scene
-    btDefaultCollisionConfiguration* collisionConfiguration; // setup for the collision manager
-    btCollisionDispatcher* dispatcher; // collision manager
-    btBroadphaseInterface* overlappingPairCache; // method for the broadphase collision detection
-    btSequentialImpulseConstraintSolver* solver; // constraints solver
+    btDiscreteDynamicsWorld* dynamicsWorld;
+	btAlignedObjectArray<btCollisionShape*> collisionShapes;
+    btDefaultCollisionConfiguration* collisionConfiguration;
+    btCollisionDispatcher* dispatcher;
+    btBroadphaseInterface* overlappingPairCache;
+    btSequentialImpulseConstraintSolver* solver;
 
-    //////////////////////////////////////////
-    // constructor
-    // we set all the classes needed for the physical simulation
+    //CONSTRUCTOR
     Physics()
     {
-        // Collision configuration, to be used by the collision detection class
-        //collision configuration contains default setup for memory, collision setup. Advanced users can create their own configuration.
         this->collisionConfiguration = new btDefaultCollisionConfiguration();
-
-        //default collision dispatcher (=collision detection method). For parallel processing you can use a diffent dispatcher (see Extras/BulletMultiThreaded)
         this->dispatcher = new btCollisionDispatcher(this->collisionConfiguration);
-
-        //btDbvtBroadphase is a good general purpose broadphase. You can also try out btAxis3Sweep.
         this->overlappingPairCache = new btDbvtBroadphase();
-
-        // we set a ODE solver, which considers forces, constraints, collisions etc., to calculate positions and rotations of the rigid bodies.
-        //the default constraint solver. For parallel processing you can use a different solver (see Extras/BulletMultiThreaded)
         this->solver = new btSequentialImpulseConstraintSolver();
-
-        //  DynamicsWorld is the main class for the physical simulation
         this->dynamicsWorld = new btDiscreteDynamicsWorld(this->dispatcher,this->overlappingPairCache,this->solver,this->collisionConfiguration);
-
-        // we set the gravity force
         this->dynamicsWorld->setGravity(btVector3(0.0f,GRAVITY,0.0f));
     }
-	
+	//In scene class, meshes are stored inside a vector of meshes; so each one of them has un unique index inside that vector.
+	//That index can be used here as well, to get the updated model transform of a mesh.
 	glm::mat4 GetObjectModelMatrix(int i)
 	{
 		btCollisionObject* collisionObject = dynamicsWorld->getCollisionObjectArray()[i];
@@ -71,7 +64,8 @@ public:
 		transform.getOpenGLMatrix(glmTransform);
 		return glm::make_mat4(glmTransform);
 	}
-	
+	//Everytime a cut occurs, we must provide two new convex hulls to the physics engine, to simulate each piece of the cut mesh correctly.
+	//This method adds the two new convex hulls generated to the simulation and applies an impulse to them, to make the physical behaviour of the cut more believable.
 	void CutShapeWithImpulse(glm::vec3 cutNormal, glm::vec3 cutDirection, int i, float negativeWeightFactor, glm::vec4 negativeMeshPosition, btConvexHullShape* negativeConvexHullShape, float positiveWeightFactor, glm::vec4 positiveMeshPosition, btConvexHullShape* positiveConvexHullShape)
 	{
 		btCollisionObject* cuttedCollisionObject = dynamicsWorld->getCollisionObjectArray()[i];
@@ -118,32 +112,29 @@ public:
 		dynamicsWorld->addRigidBody(positiveRb);
 		dynamicsWorld->addRigidBody(negativeRb);
 	}
-	
+	//This method adds the convex hull shape given to the simulation and gives an impulse to it,
+	//in order to make the respective mesh appears in the view of the camera.
 	void AddRigidBodyWithImpulse(btConvexHullShape* shape)
 	{
-		Log log=Log();
-		log.InitLog("AddRigidBodyWithImpulse");
 		btTransform startTransform;
 		startTransform.setIdentity();
 		btScalar mass(1.f);
 		btVector3 localInertia(0, 0, 0);
 		shape->calculateLocalInertia(mass, localInertia);
-		btScalar xModel = ((rand()%101)/100.f)*X_BOUNDARY * ((rand()%2)>0) ? 1 : -1;
+		btScalar xModel = ((rand()%101)/100.f)*X_BOUNDARY * ((rand()%2) == 0 ? 1.f : -1.f);
 		btScalar yModel = -5.9;
 		startTransform.setOrigin(btVector3(xModel, yModel, 0));
 		btDefaultMotionState* motionState = new btDefaultMotionState(startTransform);
 		btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, shape, localInertia);
 		rbInfo.m_angularDamping =0.90f;
-        // we create the rigid body
 		btRigidBody* body = new btRigidBody(rbInfo);
 		collisionShapes.push_back(shape);
 		dynamicsWorld->addRigidBody(body);
 		btScalar xImpulse = ((rand()%101)/101.f)*X_IMPULSE_BOUNDARY * ((rand()%2)>0) ? 1 : -1;
 		btScalar yImpulse = Y_IMPULSE_BOUNDARY;
 		body->applyImpulse(btVector3(xImpulse,yImpulse,0), btVector3(1.f,0,0));
-		log.EndLog();
 	}
-	
+
 	void RemoveRigidBodyAtIndex(int i)
 	{
 		btCollisionObject* collisionObject = dynamicsWorld->getCollisionObjectArray()[i];
@@ -165,16 +156,11 @@ public:
 		return -1;
 	}
 
-    //////////////////////////////////////////
-    // We delete the data of the physical simulation when the program ends
     void Clear()
     {
-        //we remove the rigid bodies from the dynamics world and delete them
         for (int i=this->dynamicsWorld->getNumCollisionObjects()-1; i>=0 ;i--)
         {
-            // we remove all the Motion States
             btCollisionObject* obj = this->dynamicsWorld->getCollisionObjectArray()[i];
-            // we upcast in order to use the methods of the main class RigidBody
             btRigidBody* body = btRigidBody::upcast(obj);
             if (body && body->getMotionState())
             {
@@ -184,7 +170,6 @@ public:
             delete obj;
         }
 
-        // we remove all the Collision Shapes
         for (int j=0;j<this->collisionShapes.size();j++)
         {
             btCollisionShape* shape = this->collisionShapes[j];
@@ -192,16 +177,12 @@ public:
             delete shape;
         }
 
-        //delete dynamics world
         delete this->dynamicsWorld;
 
-        //delete solver
         delete this->solver;
 
-        //delete broadphase
         delete this->overlappingPairCache;
 
-        //delete dispatcher
         delete this->dispatcher;
 
         delete this->collisionConfiguration;

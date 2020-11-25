@@ -143,15 +143,13 @@ private:
     // In this case, we pass also aiScene instance, because we need to set the materials once loaded the textures 
     Mesh processMesh(aiMesh* mesh, const aiScene* scene)
     {
-		Log log=Log();
-		log.InitLog("processMesh");
 		Vertex vertices_array[mesh->mNumVertices];
 		vector<Vertex> vertices;
         vector<GLuint> indices;
         vector<Texture> textures;
 		unordered_map<glm::vec3, bool> pointsAddedMap;
 		shape=new btConvexHullShape();
-
+		printf("Number of vertices %d\n", mesh->mNumVertices);
         // for each face of the mesh, we retrieve the indices of its vertices , and we store them in a vector data structure
         for(GLuint i = 0; i < mesh->mNumFaces; i++)
         {
@@ -183,7 +181,6 @@ private:
 		}
 		
 		vertices=std::vector<Vertex>(vertices_array, vertices_array+mesh->mNumVertices);
-		log.EndLog();
 		return Mesh(vertices, indices, textures);
     }
 

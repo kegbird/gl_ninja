@@ -1,23 +1,17 @@
 /*
-Mesh class - v2
-- allocation and initialization of VBO, VAO, and EBO buffers, and sets as OpenGL must consider the data in the buffers
-VBO : Vertex Buffer Object - memory allocated on GPU memory to store the mesh data (vertices and their attributes, like e.g. normals, etc)
-EBO : Element Buffer Object - a buffer maintaining the indices of vertices composing the mesh faces
-VAO : Vertex Array Object - a buffer that helps to "manage" VBO and its inner structure. It stores pointers to the different vertex attributes stored in the VBO. When we need to render an object, we can just bind the corresponding VAO, and all the needed calls to set up the binding between vertex attributes and memory positions in the VBO are automatically configured.
-See https://learnopengl.com/#!Getting-started/Hello-Triangle for details.
-N.B. 1) in this version of the class, textures are loaded and applied
-N.B. 2) adaptation of https://github.com/JoeyDeVries/LearnOpenGL/blob/master/includes/learnopengl/mesh.h
-author: Davide Gadia
-Real-Time Graphics Programming - a.a. 2018/2019
-Master degree in Computer Science
-Universita' degli Studi di Milano
+Mesh class:
+
+This class store and manage all data structures that define a triangular mesh on the gpu.
+Here there is the implementation of the cut method, which is the core of this project.
+Each cut produces two new meshes: the positive and negative one.
+All points of the positive mesh lies in the half space(defined by the cut segment), where the half
+plane test returns positive values (in this case, the plane is defined by the cutting segment).
 */
 
 #pragma once
 
 using namespace std;
 
-// Std. Includes
 #include <stdlib.h> 
 #include <string>
 #include <fstream>
@@ -25,10 +19,7 @@ using namespace std;
 #include <iostream>
 #include <vector>
 #include <set>
-
-// GL Includes
-#include <glad/glad.h> // Contains all the necessery OpenGL includes
-// we use GLM data structures to write data in the VBO, VAO and EBO buffers
+#include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <btConvexHullShape.h>
 #include <utils/vertex.h>
@@ -74,7 +65,6 @@ namespace std
 	typedef std::unordered_map<k_vec3_tuple, HalfEdge*, key_hash, key_equal> vertices_edge_map;
 }
 
-/////////////////// MESH class ///////////////////////
 class Mesh {
 public:
     vector<Vertex> vertices;
@@ -83,18 +73,16 @@ public:
     GLuint VAO;
 
 	Mesh(){}
-    //////////////////////////////////////////
-    // Constructor
+    //CONSTRUCTOR
 	Mesh(vector<Vertex> vertices, vector<GLuint> indices, vector<Texture> textures)
 	{
-		//this->faceList=faceList;
         this->vertices = vertices;
         this->indices = indices;
         this->textures = textures;
 		this->setupMesh();
 	}
-    //////////////////////////////////////////
-	
+	//This method calculates the area of the triangle defined by a, b, c vertices; it is used, together with the method below,
+	//to calculate the new pivots, needed after each cut.
 	float CalculateTriangleArea(glm::vec3 a, glm::vec3 b, glm::vec3 c)
 	{
 		glm::vec3 ba=b-a;
@@ -102,18 +90,25 @@ public:
 		glm::vec3 cross=glm::cross(ba, ca);
 		return (glm::sqrt(cross.x*cross.x+cross.y*cross.y+cross.z*cross.z))*0.5f;
 	}
-	
 	glm::vec3 CalculateTriangleCenter(glm::vec3 a, glm::vec3 b, glm::vec3 c)
 	{
 		glm::vec3 triangleCenter=(a+b+c)/3.0f;
 		return triangleCenter;
 	}
-	
+	//Whether a cut occurs, some new points must be generated for all triangle which intersect the cutting plane.
+	//This method returns a vector containing the new vertices, obtained from the intersection of the cutting plane and the triangle a, b, c.
+	//Intfactors is the vector that holds the interpolation factors; each interpolation factor specifies if there is or not, intersection on a particular
+	//segment of the triangle a, b, c.
+	//For instance, if the condition 0.0f<=intFactors[0]<=1.0f is true, the cutting plane intersects the segment a, b of the triangle; so it's possible
+	//to obtain the new vertex, by linear interpolating between a and b.
+	//Intfactors[0] -> interpolation between a, b
+	//Intfactors[1] -> interpolation between b, c
+	//Intfactors[2] -> interpolation between c, a
 	vector<Vertex> CalculateNewVertices(Vertex a, Vertex b, Vertex c, glm::vec4 planeNormal, glm::vec4 planePoint, float* intFactors)
 	{
 		vector<Vertex> newVertices;
 		Vertex tmp;
-		
+		//a, b
 		if(0.0f<=intFactors[0] && intFactors[0]<=1.0f)
 		{
 			tmp=Vertex();
@@ -123,7 +118,7 @@ public:
 			tmp.Bitangent=b.Bitangent*intFactors[0]+a.Bitangent*(1.0f-intFactors[0]);
 			newVertices.push_back(tmp);
 		}
-				
+		//b, c		
 		if(0.0f<=intFactors[1] && intFactors[1]<=1.0f)
 		{
 			tmp=Vertex();
@@ -133,7 +128,7 @@ public:
 			tmp.Bitangent=c.Bitangent*intFactors[1]+b.Bitangent*(1.0f-intFactors[1]);
 			newVertices.push_back(tmp);
 		}
-			
+		//c, a	
 		if(0.0f<=intFactors[2] && intFactors[2]<=1.0f)
 		{
 			tmp=Vertex();
@@ -146,7 +141,11 @@ public:
 		
 		return newVertices;
 	}
-	
+	//This function is called, only if a triangle of the mesh is divided by the cutting plane.
+	//all triangle cut by the plane must generate 3 new triangle, which are assigned to the positive or
+	//negative mesh, according how the cut has been performed.
+	//Furthermore, this method generate a new face to fill the empty section there would be after the cut.
+	//Finally these new triangles are then assigned to the positive and negative data structures.
 	void AddNewTriangle(glm::vec4 planePoint, 
 						glm::vec4 planeNormal,
 						Vertex & sectionVertexCentroid,
@@ -165,7 +164,7 @@ public:
 						vector<Vertex> newVertices,
 						vector<Vertex> triangleVertices)
 	{
-		//true means positive, false means negative
+		//True means positive, false negative.
 		bool aCheck=triangleVertices[0].PositiveOrNegativeSide(planeNormal, planePoint)>0.f;
 		bool bCheck=triangleVertices[1].PositiveOrNegativeSide(planeNormal, planePoint)>0.f;
 		bool cCheck=triangleVertices[2].PositiveOrNegativeSide(planeNormal, planePoint)>0.f;
@@ -333,7 +332,7 @@ public:
 			negativeMeshTotalArea+=triangleArea;
 		}
 		
-		//Create section face
+		//Section's face creation
 		//First push the index of the section centroid
 		positiveMeshIndices.push_back(0);
 		negativeMeshIndices.push_back(0);
@@ -382,9 +381,9 @@ public:
 			}
 		}
 		
+		//Update mesh structures
 		for(unsigned int i=0;i<positiveVertices.size();i++)
 		{
-			//update mesh structures
 			auto itV=positiveVertexIndexMap.find(positiveVertices[i]);
 			if(itV==positiveVertexIndexMap.end())
 			{
@@ -420,7 +419,6 @@ public:
 		
 		for(unsigned int i=0;i<negativeVertices.size();i++)
 		{
-			//update mesh structures
 			auto it=negativeVertexIndexMap.find(negativeVertices[i]);
 			if(it==negativeVertexIndexMap.end())
 			{
@@ -454,7 +452,10 @@ public:
 			}
 		}
 	}
-	
+	//This function calculates the interpolation factors, between a triangle and the cutting plane.
+	//These factors are needed to calculate the new points that lie on the cutting section.
+	//Each factor refers to a segment of the considered triangle: if at least two of these factors are between 0 and 1,
+	//then there is intersection.
 	bool CutTriangle(float* intFactors, vector<Vertex> triangleVertices, glm::vec3 planePoint, glm::vec3 cutNormal)
 	{
 		int tmp[]={0, 1, 1, 2, 0, 2};
@@ -480,7 +481,9 @@ public:
 			return false;
 		return true;
 	}
-	
+
+	//In case a triangle is not intersected by the cutting plane, then it must belong totally to the positive or negative part.
+	//This procedure add the points of a triangle that doesn't intersect the cutting plane, to the given data structures of positive or negative mesh.
 	void AddExistingTriangle(vector<Vertex> triangleVertices, unordered_map<Vertex, vector<int>> & vertexIndexMap, vector<GLuint> & ind, vector<Vertex> & ver, glm::vec3 & centroid, float & totalArea)
 	{			
 		int index=0;
@@ -522,8 +525,11 @@ public:
 		glm::vec3 triangleCenter=CalculateTriangleCenter(triangleVertices[0].Position, triangleVertices[1].Position, triangleVertices[2].Position);
 		centroid+=(triangleArea*triangleCenter);
 	}
-	
-	void Cut(Mesh & positiveMesh, Mesh & negativeMesh, glm::vec4 & positiveMeshPosition, glm::vec4 & negativeMeshPosition, glm::vec4 cutStartPoint, glm::vec4 cutEndPoint, glm::mat4 model ,glm::mat4 view, glm::mat4 projection, btConvexHullShape* & positiveShape, btConvexHullShape* & negativeShape, float & positiveWeightFactor, float & negativeWeightFactor)
+	//This procedure cuts the mesh in two parts: positive and negative; these new meshes are saved in positiveMesh and negativeMesh.
+	//Since physics simulation does not deal with directly with these meshes, we need also to generate some sort of bounding volume, to describe them to the physics engine.
+	//that's why each produced mesh is also paired with a convex hull.
+	//After the call of this method, the mesh involved in the cut must be removed from the scene, in order to maintain the scene consistent.
+	void Cut(Mesh & positiveMesh, Mesh & negativeMesh, glm::vec4 & positiveMeshPosition, glm::vec4 & negativeMeshPosition, glm::vec4 cutStartPoint, glm::vec4 cutEndPoint, glm::mat4 model, btConvexHullShape* & positiveShape, btConvexHullShape* & negativeShape, float & positiveWeightFactor, float & negativeWeightFactor)
 	{
 		//Convert world vertices to object space
 		glm::mat4 invModel=glm::inverse(model);
@@ -554,7 +560,7 @@ public:
 		negativeMeshVertices.push_back(sectionVertexCentroid);
 
 		Log log=Log();
-		log.InitLog("Cut loop");
+		log.InitLog("Cut");
 		for(unsigned int i=0;i<indices.size();i+=3)
 		{
 			int indA=indices[i];
@@ -608,6 +614,8 @@ public:
 			}
 		}
 		
+		log.EndLog();
+		
 		sectionVertexCentroid.Position/=positiveSectionVertexIndexMap.size();
 		
 		positiveMeshVertices[0].Position.x=sectionVertexCentroid.Position.x;
@@ -645,7 +653,7 @@ public:
 		if(negativeWeightFactor<=0)
 			negativeWeightFactor=1.f;
 		
-		log.InitLog("Centroid loop");
+		log.InitLog("Convex hull generation");
 		positiveVertexIndexMap.clear();
 		negativeVertexIndexMap.clear();
 		
@@ -685,7 +693,6 @@ public:
 		negativeMeshPosition=model*glm::vec4(negativeMeshCentroid.x, negativeMeshCentroid.y, negativeMeshCentroid.z, 1.0f);
 	}
 
-    // rendering of mesh
     void Draw(Shader shader)
     {
         // Bind appropriate textures
@@ -695,45 +702,34 @@ public:
         GLuint heightNr = 1;
         for(GLuint i = 0; i < this->textures.size(); i++)
         {
-            glActiveTexture(GL_TEXTURE0 + i); // Active proper texture unit before binding
-            // Retrieve texture number (the N in diffuse_textureN)
+            glActiveTexture(GL_TEXTURE0 + i);
             stringstream ss;
             string number;
             string name = this->textures[i].type;
             if(name == "texture_diffuse")
-                ss << diffuseNr++; // Transfer GLuint to stream
+                ss << diffuseNr++;
             else if(name == "texture_specular")
-                ss << specularNr++; // Transfer GLuint to stream
+                ss << specularNr++;
             else if(name == "texture_normal")
-                ss << normalNr++; // Transfer GLuint to stream
+                ss << normalNr++;
              else if(name == "texture_height")
-                ss << heightNr++; // Transfer GLuint to stream
+                ss << heightNr++;
             number = ss.str();
 			
-            // Now set the sampler to the correct texture unit
             glUniform1i(glGetUniformLocation(shader.Program, (name + number).c_str()), i);
-            // And finally bind the texture
             glBindTexture(GL_TEXTURE_2D, this->textures[i].id);
         }
 
-        // VAO is made "active"
         glBindVertexArray(this->VAO);
-        // rendering of data in the VAO
         glDrawElements(GL_TRIANGLES, this->indices.size(), GL_UNSIGNED_INT, 0);
-        // VAO is "detached"
         glBindVertexArray(0);
-
-        // Always good practice to set everything back to defaults once configured.
         for (GLuint i = 0; i < this->textures.size(); i++)
         {
             glActiveTexture(GL_TEXTURE0 + i);
             glBindTexture(GL_TEXTURE_2D, 0);
         }
     }
-
-    //////////////////////////////////////////
-
-    // buffers are deallocated when application ends
+	
     void Delete()
     {
         glDeleteVertexArrays(1, &VAO);
@@ -745,19 +741,9 @@ public:
     }
 
 private:
-  // VBO and EBO
   GLuint VBO, EBO;
-
-  //////////////////////////////////////////
-  // buffer objects\arrays are initialized
-  // a brief description of their role and how they are binded can be found at:
-  // https://learnopengl.com/#!Getting-started/Hello-Triangle
-  // (in different parts of the page), or here:
-  // http://www.informit.com/articles/article.aspx?p=1377833&seqNum=8
   void setupMesh()
   {
-      // we create the buffers
-      // we create the buffers
       glGenVertexArrays(1, &this->VAO);
       glGenBuffers(1, &this->VBO);
       glGenBuffers(1, &this->EBO);
@@ -787,7 +773,6 @@ private:
       // Bitangent
       glEnableVertexAttribArray(4);
       glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)offsetof(Vertex, Bitangent));
-
       glBindVertexArray(0);
   }
 };

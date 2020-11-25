@@ -1,16 +1,14 @@
 /*
-Physics class - v1:
-- initialization of the physics simulation using the Bullet librarty
+Scene class:
 
-The class sets up the collision manager and the resolver of the constraints, using basic general-purposes methods provided by the library. Advanced and multithread methods are available, please consult Bullet documentation and examples
+This class is responsible about everything rendered in the application.
+In particular it handles:
 
-createRigidBody method sets up a  Box or Sphere Collision Shape. For other Shapes, you must extend the method.
-
-author: Davide Gadia
-
-Real-Time Graphics Programming - a.a. 2018/2019
-Master degree in Computer Science
-Universita' degli Studi di Milano
+-the cut operation
+-the updates of all cuttable objects position and rotation through the physic class
+-the allocation of cuttable objects
+-the deallocation of all cuttable objects that fall outside the camera view
+-the rendering of cuttable objects and the background plane
 */
 
 #pragma once
@@ -35,7 +33,6 @@ private:
 	Shader objectShader;
 	Mesh planeMesh;
 	GLint planeTexture;
-	GLfloat planeDiffuseColor[3]={1.0f, 1.0f, 1.0f};
 	GLint objectTexture;
 	vector<Mesh> cuttableMeshes;
 	GLfloat deltaTime;
@@ -61,6 +58,7 @@ private:
 	float cutDepthNDC=0.0f;
 
 public:
+	//CONSTRUCTOR
 	Scene(glm::mat4 projection, glm::mat4 view)
 	{
 		Model* object = new Model("../../models/plane.obj");
@@ -72,15 +70,14 @@ public:
 		this->projection=projection;
 		this->view=view;
 		objectShader=Shader("lambert.vert", "lambert.frag");
-		planeShader=Shader("18_phong_tex_multiplelights.vert", "19a_blinnphong_tex_multiplelights.frag");
+		planeShader=Shader("phong_tex_multiplelights.vert", "blinnphong_tex_multiplelights.frag");
 		planeTexture=LoadTexture("../../textures/SoilCracked.png");
-		
 		glm::vec4 origin=glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 		origin=projection*view*origin;
 		origin/=origin.w;
 		cutDepthNDC=origin.z;
 	}
-	
+	//This method is used only to load the plane's texture.
 	static GLint LoadTexture(const char* path)
 	{
 		GLuint textureImage;
@@ -100,8 +97,11 @@ public:
 		stbi_image_free(image);
 		return textureImage;
 	}
-	
-	void AddMesh(int meshIndex, string meshPath)
+	//Each time there are no more cuttable meshes visible in the scene,
+	//a new mesh is added by calling this method.
+	//The new mesh will have a random diffuse color and will be added to the cuttable mesh array and
+	//in the physics simulation.
+	void AddMesh(string meshPath)
 	{
 		GLfloat red=(GLfloat)((GLfloat)(rand()%COLOR_LIMIT)/(GLfloat)COLOR_LIMIT);
 		GLfloat green=(GLfloat)((GLfloat)(rand()%COLOR_LIMIT)/(GLfloat)COLOR_LIMIT);
@@ -114,12 +114,14 @@ public:
 		cuttableMeshes.insert(cuttableMeshesIt, object->meshes.begin(), object->meshes.end());
 		engine.AddRigidBodyWithImpulse(object->shape);
 	}
-	
+	//This is a method used in the main class; whether all cuttable meshes are deallocated,
+	//this method will return a true value, implying that a new mesh will be added.
 	bool AllMeshRemoved()
 	{
 		return cuttableMeshes.size()==0;
 	}
-	
+	//This function perform the cut of all meshes that intersect the segment defined by the given positions;
+	//each mesh cut will generate two new independent meshes are subsequentialy added to the scene.
 	void Cut(glm::vec3 startCutPointNDC, glm::vec3 endCutPointNDC)
 	{
 		glm::vec4 cutStartPointWS=glm::vec4(startCutPointNDC.x, startCutPointNDC.y, cutDepthNDC, 1.);
@@ -158,8 +160,6 @@ public:
 											  cutStartPointWS, 
 											  cutEndPointWS, 
 											  model, 
-											  view, 
-											  projection, 
 											  positiveConvexHullShape, 
 											  negativeConvexHullShape, 
 											  positiveWeightFactor, 
@@ -178,16 +178,15 @@ public:
 			}
 		}
 	}
-	
+	//This method just render the background plane and all cuttable meshes; each cuttable mesh gets its model transform,
+	//from the simulation class.
 	void DrawScene()
 	{
 		planeShader.Use();
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, planeTexture);
-        // we pass projection and view matrices to the Shader Program of the plane
         glUniformMatrix4fv(glGetUniformLocation(planeShader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
         glUniformMatrix4fv(glGetUniformLocation(planeShader.Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
-        // we determine the position in the Shader Program of the uniform variables
         GLint kdLocation = glGetUniformLocation(planeShader.Program, "Kd");
         GLint textureLocation = glGetUniformLocation(planeShader.Program, "tex");
         GLint repeatLocation = glGetUniformLocation(planeShader.Program, "repeat");
@@ -232,11 +231,9 @@ public:
 			objectShader.Use();
 			glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projection));
 			glUniformMatrix4fv(glGetUniformLocation(objectShader.Program, "viewMatrix"), 1, GL_FALSE, glm::value_ptr(view));
-			// we determine the position in the Shader Program of the uniform variables
 			GLint pointLightLocation = glGetUniformLocation(objectShader.Program, "pointLightPosition");
 			GLint objectDiffuseLocation = glGetUniformLocation(objectShader.Program, "diffuseColor");
 			GLint kdObjectLocation = glGetUniformLocation(objectShader.Program, "Kd");
-			// we assign the value to the uniform variables
 			glUniform3fv(pointLightLocation, 1, glm::value_ptr(lightPositions[0]));
 			glUniform3fv(objectDiffuseLocation, 1, objectDiffuseColor);
 			glUniform1f(kdObjectLocation, Kd);
@@ -249,7 +246,7 @@ public:
 			i++;
 		}
 	}
-	
+	//This method is called to update the physics simulation.
 	void SimulationStep()
 	{		
 		currentFrame = glfwGetTime();
@@ -280,17 +277,7 @@ public:
 			}
 		}
 	}
-	
-	void RemoveAllMeshAndColliders()
-	{
-		for(int i=cuttableMeshes.size()-1; 0<=i;i--)
-		{
-			cuttableMeshes[i].Delete();
-			cuttableMeshes.erase(cuttableMeshes.begin()+i);
-			engine.RemoveRigidBodyAtIndex(i);
-		}
-	}
-	
+	//This function is called only during the application shutdown, to remove everything the scene object has allocated.
 	void Clear()
 	{
 		engine.Clear();
