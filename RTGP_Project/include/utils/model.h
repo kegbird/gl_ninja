@@ -150,6 +150,7 @@ private:
 		unordered_map<glm::vec3, bool> pointsAddedMap;
 		shape=new btConvexHullShape();
 		printf("Number of vertices %d\n", mesh->mNumVertices);
+		printf("Number of faces %d\n", mesh->mNumFaces);
         // for each face of the mesh, we retrieve the indices of its vertices , and we store them in a vector data structure
         for(GLuint i = 0; i < mesh->mNumFaces; i++)
         {

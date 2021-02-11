@@ -27,7 +27,7 @@ the scene object methods(inside the draw loop).
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#define N_MODELS 14
+#define N_MODELS 15
 
 GLuint screenWidth = 1280, screenHeight = 720;
 void drawIndicatorLine(Shader lineShader);
@@ -81,7 +81,8 @@ int main()
 	glm::mat4 projection = glm::perspective(45.0f, (float)screenWidth/(float)screenHeight, 0.1f, 15.0f);
 	glm::mat4 view = glm::lookAt(glm::vec3(0.f, 0.f, 7.f), glm::vec3(0.f, 0.f, 6.f), glm::vec3(0.f, 1.f, 0.f));
 	//These are the models cyclically loaded in the application.
-	array<string, N_MODELS> modelPaths={"../../models/cube.obj",
+	array<string, N_MODELS> modelPaths={"../../models/car.obj",
+										"../../models/cube.obj",
 										"../../models/rook.obj",
 										"../../models/pedestal.obj",
 										"../../models/horse.obj",
@@ -95,6 +96,7 @@ int main()
 										"../../models/sphere.obj",
 										"../../models/queen.obj",
 										"../../models/monkey.obj"};
+										
 	int modelIndex=0;
 	
 	Scene scene=Scene(projection, view);
@@ -113,6 +115,7 @@ int main()
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 	
+	int minFps=60, maxFps=0;
     string fpsStr="";
 	int numFrames=0;
 	
@@ -136,10 +139,13 @@ int main()
 			fpsStr="Fps: "+std::to_string(numFrames);
 			cout<<fpsStr;
 			cout << string(fpsStr.length(),'\b');
+			if(numFrames>maxFps)
+				maxFps=numFrames;
+			if(numFrames<minFps)
+				minFps=numFrames;
 			numFrames=0;
 			startTime=glfwGetTime();
 		}
-		
 		
 		if(!stop)
 			scene.SimulationStep();
@@ -172,6 +178,8 @@ int main()
         glfwSwapBuffers(window);
     }
 	
+	printf("Min fps %d\n",minFps);
+	printf("Max fps %d\n",maxFps);
 	glDeleteVertexArrays(1, &VAOCut);
     glDeleteBuffers(1, &VBOCut);
 	scene.Clear();

@@ -166,9 +166,7 @@ public:
 											  negativeWeightFactor);
 				
 				glm::vec3 cutNormal=glm::vec3(-1*(cutEndPointWS.y-cutStartPointWS.y), cutEndPointWS.x-cutStartPointWS.x, 0.0f);
-				glm::vec3 cutDirection=(cutEndPointWS-cutStartPointWS);
-				cutDirection=glm::normalize(cutDirection);
-				engine.CutShapeWithImpulse(cutNormal, cutDirection, meshIndex, negativeWeightFactor, negativeMeshPositionWS, negativeConvexHullShape, positiveWeightFactor, positiveMeshPositionWS, positiveConvexHullShape);
+				engine.CutShapeWithImpulse(cutNormal, meshIndex, negativeWeightFactor, negativeMeshPositionWS, negativeConvexHullShape, positiveWeightFactor, positiveMeshPositionWS, positiveConvexHullShape);
 				//Delete the old mesh
 				cuttableMeshes[meshIndex].Delete();
 				iter_swap(cuttableMeshes.begin()+meshIndex, cuttableMeshes.end()-1);

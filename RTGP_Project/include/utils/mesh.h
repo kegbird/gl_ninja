@@ -1,6 +1,5 @@
 /*
 Mesh class:
-
 This class store and manage all data structures that define a triangular mesh on the gpu.
 Here there is the implementation of the cut method, which is the core of this project.
 Each cut produces two new meshes: the positive and negative one.
@@ -44,25 +43,6 @@ namespace std
 			return std::hash<float>{}(v.Position.x) || std::hash<float>{}(v.Position.y) << 2 || std::hash<float>{}(v.Position.z) >> 2;
 		}
 	};
-
-	typedef std::tuple<glm::vec3, glm::vec3> k_vec3_tuple;
-		
-	struct key_hash : public std::unary_function<k_vec3_tuple, std::size_t>
-	{
-		size_t operator()(const k_vec3_tuple& tuple) const
-		{
-			return std::hash<glm::vec3>{}(std::get<0>(tuple)) ^ std::hash<glm::vec3>{}(std::get<1>(tuple));
-		}
-	};
-		
-	struct key_equal : public std::binary_function<k_vec3_tuple, k_vec3_tuple, bool>
-	{
-		bool operator()(const k_vec3_tuple& v0, const k_vec3_tuple& v1) const
-		{
-			return (std::get<0>(v0) == std::get<0>(v1) && std::get<1>(v0) == std::get<1>(v1));
-		}
-	};
-	typedef std::unordered_map<k_vec3_tuple, HalfEdge*, key_hash, key_equal> vertices_edge_map;
 }
 
 class Mesh {
@@ -477,7 +457,7 @@ public:
 			j++;
 		}
 		
-		if((intFactors[0]<0.f || 1.0f<intFactors[0]) && (intFactors[1]<0.f || 1.0f<intFactors[1]) && (intFactors[2]<0.f || 1.0f<intFactors[2]))
+		if((intFactors[0]<=0.f || 1.0f<=intFactors[0]) && (intFactors[1]<=0.f || 1.0f<=intFactors[1]) && (intFactors[2]<=0.f || 1.0f<=intFactors[2]))
 			return false;
 		return true;
 	}
@@ -607,7 +587,12 @@ public:
 			}
 			else
 			{
-				if(a.PositiveOrNegativeSide(cutNormal, cutEndPoint)>0.f)
+				//Since there can be situation in which a point lies over the plane,
+				//this code assign the triangle to the side, where the majority of points are.
+				int counter=a.PositiveOrNegativeSide(cutNormal, cutEndPoint)>.0? 1 : -1;
+				counter=b.PositiveOrNegativeSide(cutNormal, cutEndPoint)>.0? counter+1 : counter-1;
+				counter=c.PositiveOrNegativeSide(cutNormal, cutEndPoint)>.0? counter+1 : counter-1;
+				if(counter>0.f)
 					AddExistingTriangle(triangleVertices, positiveVertexIndexMap, positiveMeshIndices, positiveMeshVertices, positiveMeshCentroid, positiveArea);
 				else
 					AddExistingTriangle(triangleVertices, negativeVertexIndexMap, negativeMeshIndices, negativeMeshVertices, negativeMeshCentroid, negativeArea);
@@ -652,7 +637,7 @@ public:
 			positiveWeightFactor=1.f;
 		if(negativeWeightFactor<=0)
 			negativeWeightFactor=1.f;
-		
+			
 		log.InitLog("Convex hull generation");
 		positiveVertexIndexMap.clear();
 		negativeVertexIndexMap.clear();

@@ -66,7 +66,7 @@ public:
 	}
 	//Everytime a cut occurs, we must provide two new convex hulls to the physics engine, to simulate each piece of the cut mesh correctly.
 	//This method adds the two new convex hulls generated to the simulation and applies an impulse to them, to make the physical behaviour of the cut more believable.
-	void CutShapeWithImpulse(glm::vec3 cutNormal, glm::vec3 cutDirection, int i, float negativeWeightFactor, glm::vec4 negativeMeshPosition, btConvexHullShape* negativeConvexHullShape, float positiveWeightFactor, glm::vec4 positiveMeshPosition, btConvexHullShape* positiveConvexHullShape)
+	void CutShapeWithImpulse(glm::vec3 cutNormal, int i, float negativeWeightFactor, glm::vec4 negativeMeshPosition, btConvexHullShape* negativeConvexHullShape, float positiveWeightFactor, glm::vec4 positiveMeshPosition, btConvexHullShape* positiveConvexHullShape)
 	{
 		btCollisionObject* cuttedCollisionObject = dynamicsWorld->getCollisionObjectArray()[i];
 		btRigidBody* cuttedRigidBody = btRigidBody::upcast(cuttedCollisionObject);
